@@ -16,7 +16,7 @@ export default function Home() {
         <label htmlFor="code">Room code (4 letters)</label>
         <input id="code" value={code} maxLength={4} autoCapitalize="characters" placeholder="ABCD"
           onChange={(e) => setCode(e.target.value.toUpperCase())} />
-        <p><button disabled={code.length !== 4} onClick={() => router.push(`/play/${code}`)}>Join</button></p>
+        <p><button disabled={code.length !== 4} onClick={() => router.push(`/join/${code}`)}>Join</button></p>
       </div>
 
       <div className="card">

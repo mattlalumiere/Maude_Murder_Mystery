@@ -24,6 +24,10 @@ Murder Mystery Night is a party game for mixed-age groups (10-20 adults aged 20-
 | `web/` | Next.js app (see `web/DESIGN.md`) |
 | `web/src/lib/engine.ts` | State machine, casting, scoring, override, and the only view projections clients may see |
 | `web/src/lib/store.ts` | Storage interface: in-memory locally, DynamoDB on AWS (optimistic locking) |
+| `web/src/lib/budget.ts` | Pure cost estimates, tiers, `recommend()` and `fitPlan()` (shared by client and server) |
+| `web/src/lib/media-jobs.ts`, `media-runner.ts` | Queues avatar, scene, and video jobs per phase; runner claims one job at a time and enforces the hard spend cap |
+| `web/src/lib/media-gen.ts`, `media-store.ts` | Image/video/moderation providers (mock and Bedrock) and photo/art storage (local disk or S3) |
+| `web/src/lib/sanitize.ts` | Input clamping for config, plan, and player profile |
 | `web/src/lib/gm-ai.ts` | Bedrock case generation with fallback to `sample-case.ts` |
 | `web/src/lib/sample-case.ts` | Built-in sample case ("The Last Toast at Gus Pennywhistle's 70th") |
 | `web/sst.config.ts` | AWS infrastructure (SST v3): Lambda via OpenNext, DynamoDB with TTL, S3 |
@@ -56,7 +60,9 @@ Local dev needs `web/.env.local` with `AUTH_SECRET` and `ALLOW_DEV_LOGIN=true` (
 - Kids' content is G-rated. Kids and toddlers never take part in alcohol mechanics.
 - Alcohol is always optional with a substitute (sips only, no shots, water rounds).
 - Anyone can say "Pass". The `SAFE` command must always be honored.
-- Photo features (planned): parent or host consent for children, moderation first, nothing stored beyond the 1-day lifecycle.
+- Photos: explicit consent (guardian for under 18), moderation before storage, never served to other players (only generated art is public), 1-day expiry, deletable on request. Never put photo keys in any view.
+- Spend: every paid generation must go through `claim()` in `media-runner.ts` so the hard cap and reservation accounting apply. Never call Bedrock image or video APIs directly from a route.
+- Player-written text (backstory, hints) and host prompts are untrusted data. Pass them to models as quoted data with instructions not to follow them, and render them as plain text in the UI.
 
 ### Style
 - **No em dashes** anywhere (code, comments, docs, generated text, prompts). Use commas, colons, parentheses, or separate sentences.
@@ -73,9 +79,9 @@ Local dev needs `web/.env.local` with `AUTH_SECRET` and `ALLOW_DEV_LOGIN=true` (
 
 ## Known gaps (good next tasks)
 
-1. The AWS pieces are untested: Bedrock generation, DynamoDB store, SST deploy. No credentials were available when written.
-2. UI has not been checked in a browser at phone width.
+1. The AWS pieces are untested: Bedrock case generation, Nova Canvas/Reel calls (request shapes and prices are from documentation, not a live run), Rekognition, DynamoDB store, S3 store, SST deploy. No credentials were available when written. Prices in `budget.ts` are estimates.
+2. Only the join page and big screen were checked in a browser. The host wizard and console were tested through the API only.
 3. Per-act AI narration, an "Ask the GM" Hot Seat, and spoken narration on the big screen.
-4. Photo upload with Rekognition moderation and Nova Canvas cartoon avatars.
+4. Multi-person scene composition quality with Nova Canvas image variation needs real-world tuning.
 5. Realtime via IoT Core MQTT (currently polling every 2 seconds).
 6. Polly/Transcribe or Nova Sonic voice Game Master.

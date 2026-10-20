@@ -12,12 +12,15 @@ A guide for the host and the players. Plan on about 2 hours, 15 to 30 people, ag
 
 ## Starting the game (web app)
 
-1. Open the site and choose **Host a game**. Sign in with Google, Apple, or Facebook.
-2. Type your Host Override Code and create the room. You get a 4-letter **room code**.
-3. Open the **big screen** link on the TV.
-4. Guests open the site on their phones, enter the room code, type their name, and pick their age group. Kids and teens who want to be the victim (and come back as the Ghost) tick the box.
-5. For toddlers or anyone without a phone, use **Add player** in the host console and hand the link to their grown-up.
-6. When everyone is in, press **Cast the characters and start**. The AI picks the killer in secret.
+1. Open the site and choose **Host a game**. Sign in with Google, Apple, or Facebook (your first sign-in creates your host account).
+2. **Set up your game:** party name, how many adults, kids, and toddlers, length, spice, and drinking. Add optional prompts for theme, setting, tone, things to include, and things to avoid. Leave any blank and the AI picks.
+3. **Set your AI picture and video budget.** The page shows what your budget buys (text only, portraits, storybook, illustrated, cinematic, blockbuster) and an itemized estimate. Fine-tune it, or leave it on the recommendation. You can change or pause it during the game, and spending never exceeds your budget.
+4. Type your Host Override Code and create the room. You get a 4-letter **room code** and an **invite link** with a QR code.
+5. Open the **big screen** link on the TV.
+6. **Share the invite link with every player.** Each person builds their character: name, age group, and a backstory. They can choose "Surprise me", give the GM an idea (a hobby, a quirk), or write their own. Kids and teens who want to be the victim (and come back as the Ghost) tick the box.
+7. **Optional photo:** a player can add a photo so the AI can draw a cartoon look-alike of their character into the story. Adults consent for themselves; a parent or guardian consents for anyone under 18. Photos are never shown to other players and are deleted within 24 hours, or sooner with "Delete player photos" in the host console.
+8. For toddlers or anyone without a phone, use **Add player** in the host console and hand the link to their grown-up.
+9. When everyone is in, press **Cast the characters and start**. The AI picks the killer in secret.
 
 ## Starting the game (skill in a chat)
 
@@ -100,3 +103,10 @@ Say "voice" at the start. The AI runs a spoken roll call, announces the cast wit
 | Toddler meltdown | Press Pause |
 | The AI chat drifted (skill mode) | Say `RECAP`, and keep the whole game in one continuous chat |
 | Running over time | Use Accelerate or Jump to Reveal |
+
+## AI pictures and video
+
+- The big screen shows a new story scene for each act, with the players' cartoon characters in it. Players also see scenes on their phones.
+- Portraits appear next to each character in the cast list and on each player's card.
+- The host console shows spend against your budget. Use it to raise or lower the number of scenes per act, add or remove video clips, switch quality, or pause AI media.
+- If the budget runs out, remaining pictures are skipped and the game carries on in text.

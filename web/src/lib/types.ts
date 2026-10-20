@@ -34,6 +34,8 @@ export interface CharacterCard {
   knows: string[];
   goal: string;
   special: string;
+  /** Extra material the player supplied (own backstory or a hint for the GM). */
+  extra?: string;
 }
 
 export interface Character {
@@ -42,6 +44,8 @@ export interface Character {
   house: string;
   kid: boolean;
   role: "suspect" | "witness" | "victim" | "mascot" | "informant";
+  /** Handle (P1, P2...) of the player this character was written for, if any. */
+  forHandle?: string;
   tease: string;
   card: CharacterCard;
 }
@@ -81,11 +85,71 @@ export interface Ballot {
   motiveId: string;
 }
 
+export type Spice = "mild" | "medium" | "spicy";
+
+/** Host-provided direction for the game. Blank prompts mean "GM's pick". */
+export interface GameConfig {
+  name: string;
+  expected: { adults: number; kids: number; toddlers: number };
+  lengthMin: 90 | 120 | 150;
+  spice: Spice;
+  drinking: "adults" | "none";
+  themePrompt: string;
+  settingPrompt: string;
+  tonePrompt: string;
+  mustInclude: string;
+  avoid: string;
+  allowPlayerBackstory: boolean;
+}
+
+export interface MediaPlan {
+  avatars: boolean;
+  scenesPerAct: 0 | 1 | 2 | 3;
+  videoClips: 0 | 1 | 2 | 3 | 4;
+  quality: "standard" | "premium";
+  paused: boolean;
+}
+
+export interface BudgetState {
+  capUsd: number;
+  spentUsd: number;
+  reservedUsd: number;
+  plan: MediaPlan;
+}
+
+export interface PlayerProfile {
+  backstoryMode: "gm" | "hint" | "own";
+  backstory: string;
+  photoKey?: string;
+  consent: "none" | "self" | "guardian";
+  avatarId?: string;
+}
+
+export type MediaKind = "avatar" | "scene" | "video";
+
+export interface MediaItem {
+  id: string;
+  kind: MediaKind;
+  phase: Phase;
+  playerIds: string[];
+  prompt: string;
+  caption: string;
+  status: "queued" | "running" | "polling" | "done" | "failed" | "skipped";
+  estCostUsd: number;
+  mime?: string;
+  key?: string;
+  jobRef?: string;
+  note?: string;
+  lockUntil?: number;
+  createdAt: number;
+}
+
 export interface Player {
   id: string;
   name: string;
   ageGroup: AgeGroup;
   wantsVictim: boolean;
+  profile: PlayerProfile;
   token: string;
   characterId?: string;
   ready: boolean;
@@ -108,6 +172,9 @@ export interface Room {
   createdAt: number;
   ttl: number;
   hostId: string;
+  config: GameConfig;
+  budget: BudgetState;
+  media: MediaItem[];
   overrideSalt: string;
   overrideHash: string;
   failedOverrides: number;
@@ -118,6 +185,7 @@ export interface Room {
   paused: boolean;
   players: Player[];
   case?: CaseFile;
+  caseSource?: "sample" | "bedrock";
   releasedClueIds: string[];
   ballotsOpen: boolean;
   result?: Result;

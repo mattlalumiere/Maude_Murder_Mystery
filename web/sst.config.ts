@@ -33,6 +33,7 @@ export default $config({
         ROOMS_TABLE: rooms.name,
         MEDIA_BUCKET: media.name,
         BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID ?? "",
+        MEDIA_PROVIDER: process.env.MEDIA_PROVIDER ?? "bedrock",
         AUTH_SECRET: process.env.AUTH_SECRET ?? "",
         AUTH_TRUST_HOST: "true",
         AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID ?? "",
@@ -42,8 +43,11 @@ export default $config({
         AUTH_FACEBOOK_ID: process.env.AUTH_FACEBOOK_ID ?? "",
         AUTH_FACEBOOK_SECRET: process.env.AUTH_FACEBOOK_SECRET ?? "",
       },
+      // Photo uploads happen inside the app (resized to <2MB first), so the 6MB Lambda payload limit is fine.
+      server: { timeout: "60 seconds", memory: "1024 MB" },
       permissions: [
-        { actions: ["bedrock:InvokeModel", "bedrock:Converse", "bedrock:InvokeModelWithResponseStream"], resources: ["*"] },
+        { actions: ["bedrock:InvokeModel", "bedrock:Converse", "bedrock:InvokeModelWithResponseStream", "bedrock:StartAsyncInvoke", "bedrock:GetAsyncInvoke"], resources: ["*"] },
+        { actions: ["rekognition:DetectModerationLabels"], resources: ["*"] },
       ],
     });
   },

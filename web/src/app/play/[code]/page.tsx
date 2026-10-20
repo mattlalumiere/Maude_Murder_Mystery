@@ -1,7 +1,16 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { use, useEffect, useState } from "react";
+import { Avatar, MediaView } from "@/components/Media";
+import { PhotoPicker, uploadPhoto } from "@/components/PhotoUploader";
 import { api, useRoom } from "@/lib/client";
-import type { AgeGroup, CharacterCard } from "@/lib/types";
+import type { CharacterCard } from "@/lib/types";
+
+function Redirect({ to }: { to: string }) {
+  const router = useRouter();
+  useEffect(() => { router.replace(to); }, [router, to]);
+  return <main><p className="muted">Taking you to the character builder...</p></main>;
+}
 
 type Opt = { id: string; text?: string; name?: string };
 type PState = {
@@ -10,7 +19,8 @@ type PState = {
   ballotOptions?: { suspects: Opt[]; methods: Opt[]; motives: Opt[] };
   roster: { playerName: string; characterName: string; house: string; tease: string }[];
   reveal?: { killer?: string; method?: string; motive?: string; story: string; scores: { name: string; points: number; detail: string }[]; awards: { award: string; to: string }[] };
-  me: { id: string; name: string; ready: boolean; ballot?: { killerId: string; methodId: string; motiveId: string };
+  media: { id: string; kind: string; phase: string; caption: string; mime?: string }[];
+  me: { id: string; name: string; ageGroup: string; ready: boolean; avatarId?: string; profile: { hasPhoto: boolean; consent: string }; ballot?: { killerId: string; methodId: string; motiveId: string };
         character?: { name: string; house: string; tease: string; role: string; card: CharacterCard } };
 };
 
@@ -33,38 +43,8 @@ export default function Play({ params }: { params: Promise<{ code: string }> }) 
   }, [code]);
 
   if (creds === undefined) return <main />;
-  if (!creds) return <Join code={code} onDone={(c) => { try { localStorage.setItem(key(code), JSON.stringify(c)); } catch {} setCreds(c); }} />;
+  if (!creds) return <Redirect to={`/join/${code}`} />;
   return <Game code={code} creds={creds} />;
-}
-
-function Join({ code, onDone }: { code: string; onDone: (c: { pid: string; tok: string }) => void }) {
-  const [name, setName] = useState("");
-  const [ageGroup, setAge] = useState<AgeGroup>("adult");
-  const [wantsVictim, setWV] = useState(false);
-  const [err, setErr] = useState("");
-  async function join() {
-    setErr("");
-    try { const r = await api<{ playerId: string; token: string }>(`/api/rooms/${code}/join`, { name, ageGroup, wantsVictim }); onDone({ pid: r.playerId, tok: r.token }); }
-    catch (e) { setErr((e as Error).message); }
-  }
-  return (
-    <main>
-      <h1>Join room {code}</h1>
-      <div className="card">
-        <label htmlFor="n">Your name</label>
-        <input id="n" value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
-        <label htmlFor="a">Your age group</label>
-        <select id="a" value={ageGroup} onChange={(e) => setAge(e.target.value as AgeGroup)}>
-          <option value="adult">Grown-up</option><option value="teen">Teen (13-15)</option><option value="kid">Kid (6-12)</option><option value="little">Little kid (1-5)</option>
-        </select>
-        {(ageGroup === "kid" || ageGroup === "teen") && (
-          <label><input type="checkbox" checked={wantsVictim} onChange={(e) => setWV(e.target.checked)} />I want to be the victim and come back as the Ghost!</label>
-        )}
-        {err && <p className="err">{err}</p>}
-        <p><button disabled={!name.trim()} onClick={join}>Join</button></p>
-      </div>
-    </main>
-  );
 }
 
 function Game({ code, creds }: { code: string; creds: { pid: string; tok: string } }) {
@@ -97,7 +77,10 @@ function Game({ code, creds }: { code: string; creds: { pid: string; tok: string
 
       {ch && state.phase !== "lobby" && (
         <div className="card secret">
-          <h2 style={{ marginTop: 0 }}>You are: {ch.name}</h2>
+          <div className="row">
+            <Avatar code={code} id={me.avatarId} size={72} alt={`Portrait of ${ch.name}`} />
+            <h2 style={{ margin: 0 }}>You are: {ch.name}</h2>
+          </div>
           <p className="muted">{ch.tease} · {ch.house}</p>
           {!shown ? (
             <button onClick={() => setShown(true)}>Show my secret card</button>
@@ -108,6 +91,7 @@ function Game({ code, creds }: { code: string; creds: { pid: string; tok: string
               <p><b>Your alibi:</b> {ch.card.alibi}</p>
               <p><b>What you know:</b></p>
               <ul>{ch.card.knows.map((k, i) => <li key={i}>{k}</li>)}</ul>
+              {ch.card.extra && <p><b>From you:</b> {ch.card.extra}</p>}
               <p><b>Your goal:</b> {ch.card.goal}</p>
               <p><b>Special move:</b> {ch.card.special}</p>
               <p className="muted">You may always say &quot;Pass&quot;.</p>
@@ -118,6 +102,14 @@ function Game({ code, creds }: { code: string; creds: { pid: string; tok: string
           {me.ready && state.phase === "cards" && <p className="ok">Ready ✓</p>}
         </div>
       )}
+
+      {(state.phase === "lobby" || state.phase === "cards") && (
+        <PhotoSection code={code} creds={creds} hasPhoto={me.profile.hasPhoto} adult={me.ageGroup === "adult"} headers={headers} refresh={refresh} />
+      )}
+
+      {state.media.filter((m) => m.kind !== "avatar").slice(-3).reverse().map((m) => (
+        <div className="card" key={m.id}><MediaView code={code} m={m} /></div>
+      ))}
 
       {state.clues.length > 0 && (
         <div className="card">
@@ -160,6 +152,31 @@ function Pick({ label, value, onChange, opts }: { label: string; value: string; 
         <option value="">Choose...</option>
         {opts.map((o) => <option key={o.id} value={o.id}>{o.text}</option>)}
       </select>
+    </>
+  );
+}
+
+function PhotoSection({ code, creds, hasPhoto, adult, headers, refresh }: {
+  code: string; creds: { pid: string; tok: string }; hasPhoto: boolean; adult: boolean; headers: Record<string, string>; refresh: (f?: boolean) => Promise<void>;
+}) {
+  const [sel, setSel] = useState<{ blob: Blob | null; consent: "self" | "guardian" | null }>({ blob: null, consent: null });
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    if (!sel.blob || !sel.consent) return;
+    setBusy(true); setMsg("");
+    try { await uploadPhoto(code, creds, sel.blob, sel.consent); setMsg("Photo saved."); await refresh(true); }
+    catch (e) { setMsg((e as Error).message); }
+    setBusy(false);
+  }
+  return (
+    <>
+      <PhotoPicker isAdult={adult} onChange={setSel} disabled={busy} />
+      <div className="row">
+        <button disabled={busy || !sel.blob || !sel.consent} onClick={save}>{hasPhoto ? "Replace photo" : "Save photo"}</button>
+        {hasPhoto && <button className="ghost" onClick={async () => { await api(`/api/rooms/${code}/action`, { type: "removePhoto" }, headers); await refresh(true); setMsg("Photo removed."); }}>Remove my photo</button>}
+        {msg && <span className="muted">{msg}</span>}
+      </div>
     </>
   );
 }

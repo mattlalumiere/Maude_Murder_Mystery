@@ -2,6 +2,10 @@
 import assert from "node:assert/strict";
 import { addPlayer, advance, createRoom, hostView, override, playerView, publicView, startGame, submitBallot } from "../src/lib/engine";
 import { getStore, mutate } from "../src/lib/store";
+import { estimate, fitPlan, recommend, TIERS } from "../src/lib/budget";
+import { runNext } from "../src/lib/media-runner";
+import { setPlan } from "../src/lib/engine";
+import { getMediaStore } from "../src/lib/media-store";
 import type { AgeGroup } from "../src/lib/types";
 
 async function main() {
@@ -73,7 +77,52 @@ async function main() {
   assert.equal(room.phase, "reveal");
   const pv = publicView(room);
   assert.ok(pv.reveal?.killer, "reveal shows killer");
-  console.log("OK: casting, secrecy, phases, override, ballots, reveal");
+  // ----- budget planner -----
+  assert.equal(recommend(0, 16).best, null, "$0 buys nothing");
+  assert.equal(recommend(0.5, 16).best?.id, "text");
+  assert.equal(recommend(2, 16).best?.id, "illustrated");
+  const r15 = recommend(15, 16);
+  assert.ok(r15.best && estimate(r15.best.plan, 16).total <= r15.usable, "recommendation fits the budget");
+  assert.ok(recommend(500, 16).best?.id === "blockbuster");
+  const fitted = fitPlan(TIERS[5].plan, 5, 16);
+  assert.ok(estimate(fitted, 16).total <= 5 * 0.85 + 1e-9, "fitPlan trims to the cap");
+
+  // ----- media jobs, photo refs, hard cap -----
+  const mroom = await createRoom("host2", "mediacode", { name: "Test Party", themePrompt: "pirates" }, 1.5, { avatars: true, scenesPerAct: 1, videoClips: 1, quality: "standard" });
+  assert.equal(mroom.config.themePrompt, "pirates");
+  await mutate(mroom.code, (r) => {
+    ["Ann", "Bob", "Cy", "Di"].forEach((n, i) => addPlayer(r, n, i === 3 ? "kid" : "adult", false, true, i === 0 ? { backstoryMode: "own", backstory: "I am a retired circus strongman." } : undefined));
+  });
+  await mutate(mroom.code, async (r) => {
+    await getMediaStore().put(`${r.code}/photos/${r.players[0].id}.jpg`, Buffer.alloc(2000, 1), "image/jpeg");
+    r.players[0].profile.photoKey = `${r.code}/photos/${r.players[0].id}.jpg`; r.players[0].profile.consent = "self";
+  });
+  await mutate(mroom.code, (r) => startGame(r));
+  let m = (await getStore().get(mroom.code))!;
+  assert.equal(m.media.filter((x) => x.kind === "avatar").length, 4, "one avatar per player");
+  const own = m.case!.characters.find((c) => c.id === m.players[0].characterId)!;
+  assert.ok(own.card.extra?.includes("circus strongman"), "own backstory lands on the card");
+  for (let i = 0; i < 40; i++) { const r = await runNext(mroom.code); if (!r.ran) break; }
+  m = (await getStore().get(mroom.code))!;
+  assert.ok(m.budget.spentUsd <= m.budget.capUsd + 1e-9, "never exceeds the cap");
+  assert.equal(m.budget.reservedUsd, 0, "no dangling reservations");
+  assert.equal(m.media.filter((x) => x.kind === "avatar" && x.status === "done").length, 4);
+  assert.ok(m.players.every((p) => p.profile.avatarId), "avatar ids recorded");
+  const pubMedia = JSON.stringify(publicView(m));
+  assert.ok(!pubMedia.includes("photos/"), "photo keys never in public view");
+  // Tight cap: raise scenes, advance through the game, ensure overflow is skipped not spent.
+  await mutate(mroom.code, (r) => setPlan(r, { scenesPerAct: 3, videoClips: 4 }));
+  for (let i = 0; i < 7; i++) await mutate(mroom.code, (r) => advance(r));
+  for (let i = 0; i < 80; i++) { const r = await runNext(mroom.code); if (!r.ran) break; }
+  m = (await getStore().get(mroom.code))!;
+  assert.ok(m.budget.spentUsd <= 1.5 + 1e-9, `spent ${m.budget.spentUsd} within cap`);
+  assert.ok(m.media.some((x) => x.status === "skipped" && /budget/.test(x.note ?? "")), "over-budget jobs skipped");
+  assert.throws(() => setPlan(m, undefined, 0.01), /cannot go below/);
+  // Paused plan stops work.
+  await mutate(mroom.code, (r) => { r.media.push({ id: "zz", kind: "scene", phase: "act1", playerIds: [], prompt: "x", caption: "x", status: "queued", estCostUsd: 0.01, createdAt: 0 }); setPlan(r, { paused: true }); });
+  assert.equal((await runNext(mroom.code)).ran, false, "paused plan does nothing");
+
+  console.log("OK: casting, secrecy, phases, override, ballots, reveal, budget planner, media jobs, spend cap");
   console.log("Killer:", pv.reveal?.killer, "| top score:", pv.reveal?.scores[0]);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

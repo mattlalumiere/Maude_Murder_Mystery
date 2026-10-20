@@ -8,7 +8,7 @@ export default async function Login({ searchParams }: { searchParams: Promise<{ 
   return (
     <main>
       <h1>Sign in to host</h1>
-      <p className="muted">Only the host signs in. Guests join with a room code.</p>
+      <p className="muted">Your first sign-in creates your host account. Pick any provider, then you will set up your game: theme, players, budget, and your secret code. Players never need an account, they just use your invite link.</p>
       {providerIds.length === 0 && (
         <p className="err">No sign-in providers are configured. Set AUTH_GOOGLE_ID/SECRET (and optionally Apple/Facebook) or ALLOW_DEV_LOGIN=true for local development.</p>
       )}

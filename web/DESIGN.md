@@ -38,3 +38,19 @@ Rough cost for one 20-person party: well under $1 with AI text only, a few dolla
 2. Per-act AI narration, "Ask the GM" Hot Seat, Web Speech narration on the big screen.
 3. Photo upload, moderation, cartoon avatars, victim and evidence scenes.
 4. Polly/Transcribe voice GM; IoT Core realtime; saved games per host.
+
+## Registration, player builder, and AI media (iteration 2)
+
+**Flow.** Host signs in (`/login`), registers the game (`/host/new`: direction prompts, budget and media plan, override code), then shares `/join/CODE` (link and QR on the big screen). Players build characters there: name, age group, backstory mode (GM's pick, a hint, or their own text), optional photo with consent.
+
+**Direction prompts.** `GameConfig` holds theme, setting, tone, spice, drinking, must-include, avoid, and length. Blank fields are sent to the model as "GM's pick". Without Bedrock the built-in sample case is used and the host console says so.
+
+**Player input.** Backstory text is clamped to 600 characters, passed to the model as quoted JSON data, and shown on the card as written (own mode) or woven in (hint mode, via `forHandle`).
+
+**Photos.** Client resizes to 768px JPEG; server checks size, JPEG magic bytes, consent, and (on AWS) Rekognition moderation, stores under `CODE/photos/` (1-day lifecycle), and uses them only as reference images for Nova Canvas image variation. They are never in any view or served publicly. Players and the host can delete them.
+
+**Budget.** `budget.ts` prices portraits, scenes, and 6-second clips; `recommend()` names the best tier for a budget and the cost of the next step up; `fitPlan()` trims a plan to a cap. The cap is enforced in `claim()`: a job is skipped if spent plus reserved plus its estimate would exceed the cap. Spend is recorded when a job completes; reservations are released on failure. The host can change the plan or cap live (never below what is spent) or pause AI media.
+
+**Job queue.** Entering an act enqueues scene and video jobs from public narration and public character descriptions only (no truth is used before the reveal). A worker tick, triggered by the host console every few seconds, runs one job at a time. Images are synchronous; video is an async Bedrock invocation polled every 8 seconds. Each stage persists, so it works on Lambda.
+
+**Rough prices (estimates, check AWS):** image 0.04 to 0.06 USD, 6 s video about 0.48 USD, text about 0.40 USD per game. A 16-player game with portraits, one scene per act, and two clips is about 2.5 USD.

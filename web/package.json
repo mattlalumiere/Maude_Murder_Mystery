@@ -12,14 +12,18 @@
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.700.0",
     "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/client-rekognition": "^3.1153.0",
+    "@aws-sdk/client-s3": "^3.1153.0",
     "@aws-sdk/lib-dynamodb": "^3.700.0",
     "next": "^15.1.0",
     "next-auth": "5.0.0-beta.25",
+    "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "typescript": "^5.6.0"

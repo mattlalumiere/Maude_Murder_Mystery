@@ -24,6 +24,9 @@ Everything is fiction. Anyone can say "Pass". Alcohol is always optional.
 - **Drinking and silly mechanics** that are optional, safe, and passable.
 - **Voice mode:** spoken roll call, cast announcement, and narration.
 - **Host Override Code:** nudge, advanced clue, accelerate, or the final answer if the game runs long.
+- **Registration wizard (web):** the host signs in, then sets the game's direction (theme, setting, tone, spice, drinking, must-include and avoid lists). Any blank prompt means the AI picks.
+- **Player character builder (web):** everyone gets one invite link (and a QR code on the big screen). Players choose "surprise me", give the GM an idea, or write their own backstory, and can upload a photo (with consent) for a cartoon look-alike.
+- **AI pictures and video with a hard budget:** the host sets a maximum spend, sees what it buys (portraits, scene art per act, short video clips), tunes it live, and the server never spends past the cap.
 
 ## Quick start: skill
 
@@ -46,7 +49,7 @@ npm run dev                    # http://localhost:3000
 npm run test:smoke             # engine tests
 ```
 
-Without `ROOMS_TABLE` it uses an in-memory store. Without `BEDROCK_MODEL_ID` it uses the built-in sample case. Hosts sign in with Google, Apple, or Facebook (Auth.js); guests join with a 4-letter room code and no account.
+Without `ROOMS_TABLE` it uses an in-memory store. Without `BEDROCK_MODEL_ID` it uses the built-in sample case. With `MEDIA_PROVIDER=mock` (the default locally) pictures are placeholder cards, so the whole flow works without AWS; set `MEDIA_PROVIDER=bedrock` on AWS for Nova Canvas, Nova Reel, and Rekognition. Hosts sign in with Google, Apple, or Facebook (Auth.js); guests join with a 4-letter room code and no account.
 
 Deploy to AWS (Lambda, DynamoDB with 24-hour TTL, S3, Bedrock) with SST:
 
@@ -58,8 +61,8 @@ See `web/DESIGN.md` for architecture, cost, and security notes. The AWS pieces h
 
 ## How a night works
 
-1. The host creates a room (or starts a chat) and sets a secret Host Override Code.
-2. Guests join and the AI casts everyone. Kids and teens can volunteer to be the victim.
+1. The host signs in, registers the game (direction prompts, budget, secret Host Override Code), and shares the invite link.
+2. Guests open the link and build their characters (backstory, optional photo). The AI casts everyone. Kids and teens can volunteer to be the victim.
 3. Each guest receives a private card. The cast is announced publicly; only the secrets are hidden.
 4. Acts run in order: party, death, interrogation and clues, twist, accusations, reveal.
 5. Players submit secret accusations (who, how, why). The reveal scores everyone and hands out awards.
@@ -71,7 +74,8 @@ See [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for the full host and player gu
 - Secrets are fictional and never about real people's lives or relationships.
 - Alcohol is optional with a substitute, sips only, with water rounds and designated-driver reminders. `SAFE` drops all drinking and dares instantly.
 - Kids and toddlers never take part in alcohol mechanics and get G-rated cards. The "murder" is a cartoon pratfall.
-- Photo features (planned) require parent or host consent for children and expire after one day.
+- Photos need explicit consent (a parent or guardian for anyone under 18), are moderated, are never shown to other players, expire after one day, and can be deleted by the host or the player at any time. Only generated cartoon art is shown on screens.
+- AI spending is capped server-side at the host's budget.
 
 ## Repository layout
 
@@ -86,9 +90,9 @@ See [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for the full host and player gu
 
 ## Roadmap
 
-1. Verify the web UI in a browser and deploy to AWS.
+1. Deploy to AWS and tune the Bedrock image and video prompts against real output.
 2. Per-act AI narration, an "Ask the GM" Hot Seat, spoken narration on the big screen.
-3. Photo upload, moderation, and cartoon avatars; generated evidence and scene art.
+3. Multi-person scene composition and generated evidence images.
 4. Realtime via IoT Core, a Polly/Transcribe or Nova Sonic voice Game Master, saved games.
 
 ## Contributing

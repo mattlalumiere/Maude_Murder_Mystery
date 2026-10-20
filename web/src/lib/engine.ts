@@ -1,9 +1,13 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { fitPlan, recommend, TIERS } from "./budget";
 import { generateCase } from "./gm-ai";
+import { queueAvatars, queuePhaseMedia, reconcilePlan } from "./media-jobs";
+import { getMediaStore } from "./media-store";
+import { money, sanitizeConfig, sanitizePlan, sanitizeProfile } from "./sanitize";
 import { getStore, HttpError } from "./store";
 import {
   PHASES, PHASE_INFO,
-  type AgeGroup, type Ballot, type Character, type Phase, type Player, type Result, type Room,
+  type AgeGroup, type Ballot, type Character, type GameConfig, type MediaPlan, type Phase, type Player, type PlayerProfile, type Result, type Room,
 } from "./types";
 
 const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -18,15 +22,22 @@ const shuffle = <T,>(a: T[]) => {
 };
 
 // ---------- creation / joining ----------
-export async function createRoom(hostId: string, overrideCode: string): Promise<Room> {
+export async function createRoom(
+  hostId: string, overrideCode: string, configIn?: Partial<GameConfig>, capIn?: number, planIn?: Partial<MediaPlan>,
+): Promise<Room> {
   if (overrideCode.trim().length < 4) throw new HttpError(400, "Override code must be at least 4 characters");
+  const config = sanitizeConfig(configIn);
+  const cap = money(capIn);
+  const expected = config.expected.adults + config.expected.kids + config.expected.toddlers;
+  const plan = fitPlan(sanitizePlan(planIn ?? (recommend(cap, expected).best ?? TIERS[0]).plan), cap, expected);
   const store = getStore();
   for (let i = 0; i < 20; i++) {
     const code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
     const salt = rid(8);
     const now = Math.floor(Date.now() / 1000);
     const room: Room = {
-      code, version: 1, createdAt: now, ttl: now + DAY, hostId,
+      code, version: 1, createdAt: now, ttl: now + DAY, hostId, config, media: [],
+      budget: { capUsd: cap, spentUsd: 0, reservedUsd: 0, plan },
       overrideSalt: salt, overrideHash: hashCode(overrideCode, salt),
       failedOverrides: 0, lockedUntil: 0, overrideUsed: false,
       phase: "lobby", phaseStartedAt: Date.now(), paused: false,
@@ -37,14 +48,17 @@ export async function createRoom(hostId: string, overrideCode: string): Promise<
   throw new HttpError(500, "Could not allocate a room code");
 }
 
-export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true): Player {
+export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>): Player {
   if (room.phase !== "lobby") throw new HttpError(409, "The game has already started");
   const clean = name.trim().slice(0, 24);
   if (!clean) throw new HttpError(400, "Name required");
   if (!["little", "kid", "teen", "adult"].includes(ageGroup)) throw new HttpError(400, "Bad age group");
   if (room.players.length >= 40) throw new HttpError(409, "Room is full");
   if (room.players.some((p) => p.name.toLowerCase() === clean.toLowerCase())) throw new HttpError(409, "That name is taken");
-  const p: Player = { id: rid(6), name: clean, ageGroup, wantsVictim, token: rid(18), ready: false, hasDevice };
+  const p: Player = {
+    id: rid(6), name: clean, ageGroup, wantsVictim, token: rid(18), ready: false, hasDevice,
+    profile: sanitizeProfile(profile, room.config.allowPlayerBackstory),
+  };
   room.players.push(p);
   return p;
 }
@@ -95,32 +109,53 @@ function castPlayers(room: Room) {
   const killer = chars.find((c) => c.id === k.killerId)!;
   assign(adults.shift()!, killer);
 
-  // Remaining adults.
+  // Remaining adults (characters written for a player's note go to that player first).
+  const handle = (p: Player) => `P${room.players.indexOf(p) + 1}`;
   const adultChars = chars.filter((c) => !c.kid && !taken.has(c.id));
   let g = 1;
-  for (const p of adults) assign(p, adultChars.shift() ?? (chars.push(generic(g++, false)), chars[chars.length - 1]));
+  for (const p of adults) {
+    const i = adultChars.findIndex((c) => c.forHandle === handle(p));
+    const mine = i >= 0 ? adultChars.splice(i, 1)[0] : undefined;
+    assign(p, mine ?? adultChars.shift() ?? (chars.push(generic(g++, false)), chars[chars.length - 1]));
+  }
 
   // Remaining young players, picking the best-fitting remaining character.
   const rest = shuffle(room.players.filter((p) => !p.characterId));
   let gk = 1;
   for (const p of rest) {
-    const pool = chars.filter((c) => c.kid && !taken.has(c.id)).sort((a, b) => pref(a, p.ageGroup) - pref(b, p.ageGroup));
+    const pool = chars.filter((c) => c.kid && !taken.has(c.id))
+      .sort((a, b) => Number(b.forHandle === handle(p)) - Number(a.forHandle === handle(p)) || pref(a, p.ageGroup) - pref(b, p.ageGroup));
     const pick = pool[0] ?? (chars.push(generic(gk++, true)), chars[chars.length - 1]);
     assign(p, pick);
   }
   k.characters = chars;
+
+  // Player-supplied material goes on the card (their own words are never rewritten).
+  for (const p of room.players) {
+    const c = chars.find((x) => x.id === p.characterId);
+    if (!c || !p.profile.backstory) continue;
+    c.card.extra = p.profile.backstoryMode === "own"
+      ? `Your own backstory (from you): ${p.profile.backstory}`
+      : `Your idea for the GM: ${p.profile.backstory}`;
+  }
 }
 
-export async function startGame(room: Room, theme?: string) {
+export async function startGame(room: Room) {
   if (room.phase !== "lobby") throw new HttpError(409, "Already started");
   if (room.players.length < 4) throw new HttpError(400, "Need at least 4 players");
   if (room.players.filter((p) => p.ageGroup === "adult").length < 2) throw new HttpError(400, "Need at least 2 adults");
   const adults = room.players.filter((p) => p.ageGroup === "adult").length;
-  room.case = await generateCase(
-    { adults, kids: room.players.length - adults, littles: room.players.filter((p) => p.ageGroup === "little").length, names: room.players.map((p) => p.name) },
-    theme,
+  const gen = await generateCase(
+    {
+      adults, kids: room.players.length - adults, littles: room.players.filter((p) => p.ageGroup === "little").length,
+      players: room.players.map((p, i) => ({ handle: `P${i + 1}`, ageGroup: p.ageGroup, mode: p.profile.backstoryMode, text: p.profile.backstory })),
+    },
+    room.config,
   );
+  room.case = gen.case;
+  room.caseSource = gen.source;
   castPlayers(room);
+  queueAvatars(room);
   setPhase(room, "cards");
 }
 
@@ -134,6 +169,7 @@ function setPhase(room: Room, phase: Phase) {
   if (phase === "act3") release([...k.clues.filter((c) => c.round === 2).map((c) => c.id), "twist"]);
   room.ballotsOpen = phase === "act4";
   if (phase === "reveal") room.result = computeResult(room);
+  queuePhaseMedia(room, phase);
 }
 
 export function advance(room: Room) {
@@ -246,7 +282,7 @@ export function publicView(room: Room) {
   const roster = k
     ? room.players.map((p) => {
         const c = k.characters.find((x) => x.id === p.characterId);
-        return { playerName: p.name, characterName: c?.name ?? "", house: c?.house ?? "", tease: c?.tease ?? "", kid: c?.kid ?? false };
+        return { playerName: p.name, characterName: c?.name ?? "", house: c?.house ?? "", tease: c?.tease ?? "", kid: c?.kid ?? false, avatarId: p.profile.avatarId };
       })
     : [];
   const clues = k
@@ -254,7 +290,8 @@ export function publicView(room: Room) {
     : [];
   return {
     code: room.code, version: room.version, phase: room.phase, phaseTitle: info.title, clock: info.clock, paused: room.paused,
-    title: k?.title, setting: k?.setting,
+    title: k?.title, setting: k?.setting, partyName: room.config.name || k?.title || "Murder Mystery Night",
+    media: room.media.filter((m) => m.status === "done").map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, caption: m.caption, mime: m.mime })),
     narration: k?.narration[room.phase],
     lobbyNames: room.players.map((p) => p.name),
     roster, clues,
@@ -280,7 +317,8 @@ export function playerView(room: Room, p: Player) {
   return {
     ...publicView(room),
     me: {
-      id: p.id, name: p.name, ready: p.ready, ballot: p.ballot,
+      id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, ballot: p.ballot, avatarId: p.profile.avatarId,
+      profile: { backstoryMode: p.profile.backstoryMode, backstory: p.profile.backstory, consent: p.profile.consent, hasPhoto: !!p.profile.photoKey },
       character: c ? { id: c.id, name: c.name, house: c.house, tease: c.tease, kid: c.kid, role: c.role, card: c.card } : undefined,
     },
   };
@@ -292,9 +330,14 @@ export function hostView(room: Room) {
     ...publicView(room),
     overrideUsed: room.overrideUsed,
     lockedUntil: room.lockedUntil,
+    config: room.config,
+    caseSource: room.caseSource,
+    budget: room.budget,
+    jobs: room.media.slice(-60).map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, status: m.status, note: m.note, est: m.estCostUsd, caption: m.caption })),
     runSheet: PHASES.map((ph) => ({ phase: ph, ...PHASE_INFO[ph] })),
     players: room.players.map((p) => ({
       id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, hasDevice: p.hasDevice, ballot: !!p.ballot,
+      hasPhoto: !!p.profile.photoKey, backstory: p.profile.backstoryMode,
       characterName: k?.characters.find((c) => c.id === p.characterId)?.name,
     })),
   };
@@ -304,4 +347,33 @@ export function authPlayer(room: Room, id: string | null, token: string | null):
   const p = room.players.find((x) => x.id === id);
   if (!p || !token || p.token !== token) throw new HttpError(401, "Unknown player");
   return p;
+}
+
+// ---------- media plan, photos ----------
+export function setPlan(room: Room, planIn: Partial<MediaPlan> | undefined, capIn?: number) {
+  const b = room.budget;
+  if (capIn !== undefined) {
+    const cap = money(capIn);
+    if (cap < b.spentUsd + b.reservedUsd) throw new HttpError(400, `Budget cannot go below what is already spent or reserved ($${(b.spentUsd + b.reservedUsd).toFixed(2)})`);
+    b.capUsd = cap;
+  }
+  b.plan = sanitizePlan(planIn, b.plan);
+  reconcilePlan(room);
+}
+
+export function setPhoto(room: Room, p: Player, key: string, consent: "self" | "guardian") {
+  if (p.ageGroup !== "adult" && consent !== "guardian") throw new HttpError(400, "A parent or guardian must consent for players under 18");
+  p.profile.photoKey = key;
+  p.profile.consent = consent;
+}
+
+export async function removePhoto(room: Room, p: Player) {
+  if (p.profile.photoKey) await getMediaStore().deletePrefix(p.profile.photoKey);
+  p.profile.photoKey = undefined;
+  p.profile.consent = "none";
+}
+
+export async function purgePhotos(room: Room) {
+  await getMediaStore().deletePrefix(`${room.code}/photos`);
+  for (const p of room.players) { p.profile.photoKey = undefined; p.profile.consent = "none"; }
 }
