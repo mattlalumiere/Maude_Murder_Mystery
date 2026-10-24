@@ -1,18 +1,19 @@
 "use client";
 import { useRef, useState } from "react";
 import { CameraCapture, liveCameraAvailable } from "@/components/CameraCapture";
-import { MediaView } from "@/components/Media";
+import { Avatar, MediaView } from "@/components/Media";
 import { resizeToJpeg } from "@/components/PhotoUploader";
 import { Button, Card, ErrorNote } from "@/components/kit";
 import { friendlyError, uploadSelfie, type Creds } from "@/lib/client";
 import { SELFIE_STYLES } from "@/lib/selfie-styles";
 
-type Mine = { id: string; status: string; note?: string }[];
+type Mine = { id: string; status: string; note?: string; style?: string; canRedo?: boolean }[];
 type Wall = { id: string; caption: string }[];
 
 /** Selfie booth: take a photo, pick a style, and the AI turns it into something silly that is shared on the wall. */
-export function SelfieBooth({ code, creds, adult, ok, mine, wall, refresh }: {
+export function SelfieBooth({ code, creds, adult, ok, mine, wall, refresh, avatarId, portraitRedos, onAction, busy: parentBusy }: {
   code: string; creds: Creds; adult: boolean; ok: boolean; mine: Mine; wall: Wall; refresh: (f?: boolean) => Promise<void>;
+  avatarId?: string; portraitRedos: number; onAction: (body: object) => Promise<void>; busy: boolean;
 }) {
   const [style, setStyle] = useState<string>(SELFIE_STYLES[0].id);
   const [agreed, setAgreed] = useState(false);
@@ -70,8 +71,30 @@ export function SelfieBooth({ code, creds, adult, ok, mine, wall, refresh }: {
           {pending > 0 && <p className="muted" role="status">Developing {pending} picture{pending > 1 ? "s" : ""}...</p>}
           {msg && <p className="muted" role="status" data-testid="selfie-message">{msg}</p>}
           {err && <ErrorNote data-testid="selfie-error">{err}</ErrorNote>}
-          <p className="muted" style={{ fontSize: "var(--text-xs)" }}>Your original photo is used once to make the picture and is then deleted. Only the funny picture is shown. Up to three each.</p>
+          <p className="muted" style={{ fontSize: "var(--text-xs)" }}>Your original photo is kept only so you can redo a picture, is never shown, and is deleted when you delete your pictures or at the reveal. Only the funny picture is shown. Up to three at a time.</p>
         </>
+      )}
+      {(avatarId || portraitRedos < 3) && (
+        <div data-testid="my-portrait" style={{ marginTop: "var(--space-3)", display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap" }}>
+          <Avatar code={code} id={avatarId} size={72} alt="My portrait" />
+          <div className="sc-actions">
+            <Button variant="secondary" disabled={parentBusy || portraitRedos <= 0} onClick={() => void onAction({ type: "regenPortrait" })} data-testid="portrait-regen">New portrait ({portraitRedos} left)</Button>
+            {avatarId && <Button variant="ghost" disabled={parentBusy} onClick={() => void onAction({ type: "deletePortrait" })} data-testid="portrait-delete">Delete my portrait</Button>}
+          </div>
+        </div>
+      )}
+      {mine.length > 0 && (
+        <ul className="clean" data-testid="my-selfies" style={{ marginTop: "var(--space-3)" }}>
+          {mine.map((m) => (
+            <li key={m.id} data-testid="my-selfie" style={{ display: "flex", gap: "var(--space-3)", alignItems: "center", flexWrap: "wrap", marginBottom: "var(--space-2)" }}>
+              {m.status === "done" ? <div style={{ width: 72 }}><MediaView code={code} m={{ id: m.id, kind: "selfie", phase: "", caption: "" }} /></div> : <span className="muted">{m.status === "failed" || m.status === "skipped" ? (m.note ?? "Did not work out") : "Developing..."}</span>}
+              <div className="sc-actions">
+                <Button variant="secondary" disabled={parentBusy || !m.canRedo || m.status === "queued" || m.status === "running"} onClick={() => void onAction({ type: "regenSelfie", id: m.id, style })} data-testid="selfie-redo">{m.canRedo ? "Redo in the style above" : "Original is gone"}</Button>
+                <Button variant="ghost" disabled={parentBusy} onClick={() => void onAction({ type: "deleteSelfie", id: m.id })} data-testid="selfie-delete">Delete</Button>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
       {wall.length > 0 && (
         <div data-testid="selfie-wall" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "var(--space-3)", marginTop: "var(--space-3)" }}>

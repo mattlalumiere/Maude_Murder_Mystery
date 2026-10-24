@@ -75,7 +75,7 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
           {(state.phase === "cards" || state.phase === "act1") && <RulesCard drinking={state.drinking} big />}
           {state.ballotsOpen && <p className="sc-tv-votes" data-testid="tv-ballots" role="status">Accusations in: {state.ballotsIn} of {state.totalPlayers}</p>}
           {state.phase === "cards" && state.launch && <LaunchProgress launch={state.launch} big />}
-          {state.round?.intermission && <Intermission code={code} round={state.round} recap={state.recap ?? []} big basis={state} />}
+          {state.round?.intermission && <Intermission code={code} round={state.round} recap={state.recap ?? []} selfies={state.selfies} roster={state.roster} big basis={state} />}
           {state.round?.canReady && !state.reveal && state.round.total > 0 && (
             <p className="sc-tv-votes" role="status" data-testid="tv-ready">Ready: {state.round.ready} of {state.round.total}{countdown !== null ? `, moving on in ${Math.floor(countdown / 60000)}:${String(Math.ceil((countdown % 60000) / 1000) % 60).padStart(2, "0")}` : ""}</p>
           )}

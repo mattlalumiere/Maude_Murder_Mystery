@@ -78,8 +78,6 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
     out = { kind: "failed", note: `Generation failed: ${(e as Error).message}`.slice(0, 200) };
   }
 
-  // A selfie's raw photo is only a reference: it is deleted as soon as the job has ended.
-  if (job.kind === "selfie" && job.refKey && out.kind !== "polling") await getMediaStore().deletePrefix(job.refKey).catch(() => {});
   let key: string | undefined;
   if (out.kind === "done") {
     key = `${code}/gen/${job.id}.${ext(out.mime)}`;

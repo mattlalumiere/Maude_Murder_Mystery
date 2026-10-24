@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { pricesForRoom } from "./ai/route";
 import { imageCost } from "./budget";
 import { CARTOON_SHORT } from "./prompt-director";
+import { getMediaStore } from "./media-store";
 import { HttpError } from "./store";
 import type { Player, Room } from "./types";
 
@@ -20,6 +21,8 @@ export const SELFIE_STYLES: SelfieStyle[] = [
 
 export const MAX_SELFIES_PER_PLAYER = 3;
 export const MAX_SELFIES_PER_ROOM = 60;
+/** Every make counts, even after a delete, so redoing cannot be used to spend without limit. */
+export const MAX_SELFIE_MAKES_PER_PLAYER = 6;
 
 export const styleById = (id: unknown) => SELFIE_STYLES.find((s) => s.id === id);
 
@@ -30,12 +33,44 @@ export function queueSelfie(room: Room, p: Player, styleId: unknown, refKey: str
   if (room.budget.plan.paused) throw new HttpError(409, "Pictures are paused by the host");
   const mine = room.media.filter((m) => m.kind === "selfie" && m.playerIds[0] === p.id && m.status !== "failed" && m.status !== "skipped").length;
   if (mine >= MAX_SELFIES_PER_PLAYER) throw new HttpError(409, `That is ${MAX_SELFIES_PER_PLAYER} selfies. Save some film for the others!`);
+  if ((room.selfieMade?.[p.id] ?? 0) >= MAX_SELFIE_MAKES_PER_PLAYER) throw new HttpError(409, "That is all the film for tonight");
   if (room.media.filter((m) => m.kind === "selfie").length >= MAX_SELFIES_PER_ROOM) throw new HttpError(409, "The selfie booth is closed for tonight");
   const est = imageCost(room.budget.plan.quality, pricesForRoom(room));
   const b = room.budget;
   if (b.spentUsd + b.reservedUsd + est > b.capUsd + 1e-9) throw new HttpError(409, "The picture budget is used up");
+  room.selfieMade = { ...(room.selfieMade ?? {}), [p.id]: (room.selfieMade?.[p.id] ?? 0) + 1 };
   room.media.push({
-    id: randomBytes(8).toString("base64url"), kind: "selfie", phase: room.phase, playerIds: [p.id], refKey,
+    id: randomBytes(8).toString("base64url"), kind: "selfie", phase: room.phase, playerIds: [p.id], refKey, style: style.id,
     caption: `${p.name}, ${style.caption}`, prompt: `${style.prompt}, ${CARTOON_SHORT}`, status: "queued", estCostUsd: est, createdAt: Date.now(),
   });
+}
+
+const mine = (room: Room, p: Player, id: string) => {
+  const m = room.media.find((x) => x.id === id && x.kind === "selfie" && x.playerIds[0] === p.id);
+  if (!m) throw new HttpError(404, "That is not one of your selfies");
+  return m;
+};
+
+/** Removes one of the player's selfie pictures for good. The original photo goes too once no picture of theirs needs it. */
+export async function deleteSelfie(room: Room, p: Player, id: string) {
+  const m = mine(room, p, id);
+  if (m.key) await getMediaStore().deletePrefix(m.key).catch(() => {});
+  room.media = room.media.filter((x) => x.id !== m.id);
+  if (m.refKey && !room.media.some((x) => x.refKey === m.refKey)) await getMediaStore().deletePrefix(m.refKey).catch(() => {});
+}
+
+/** Makes a new picture from the same original, in the chosen style (or the same one). */
+export function regenSelfie(room: Room, p: Player, id: string, styleId?: unknown) {
+  const m = mine(room, p, id);
+  if (!m.refKey) throw new HttpError(409, "The original photo is gone. Take a new selfie instead.");
+  queueSelfie(room, p, styleId ?? m.style, m.refKey);
+}
+
+/** Deletes everything this player made in the booth (used when they leave). */
+export async function deleteAllSelfies(room: Room, p: Player) {
+  for (const m of room.media.filter((x) => x.kind === "selfie" && x.playerIds[0] === p.id)) {
+    if (m.key) await getMediaStore().deletePrefix(m.key).catch(() => {});
+    if (m.refKey) await getMediaStore().deletePrefix(m.refKey).catch(() => {});
+  }
+  room.media = room.media.filter((x) => !(x.kind === "selfie" && x.playerIds[0] === p.id));
 }

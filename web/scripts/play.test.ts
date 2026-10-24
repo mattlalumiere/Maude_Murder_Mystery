@@ -5,6 +5,8 @@ import { runNext } from "../src/lib/media-runner";
 import { getMediaStore } from "../src/lib/media-store";
 import { POST as chatPost } from "../src/app/api/rooms/[code]/chat/route";
 import { POST as selfiePost } from "../src/app/api/rooms/[code]/selfie/route";
+import { deleteSelfie, regenSelfie } from "../src/lib/selfie";
+import { dropAvatar, regenAvatar } from "../src/lib/media-jobs";
 import { SELFIE_STYLES } from "../src/lib/selfie-styles";
 import { getStore, mutate } from "../src/lib/store";
 
@@ -79,24 +81,59 @@ async function main() {
   for (let i = 0; i < 4; i++) if (!(await runNext(code)).ran) break;
   room = await load(code);
   assert.equal(room.media.find((m) => m.id === job.id)!.status, "done");
-  assert.equal(await getMediaStore().get(rawKey), null, "the raw photo is deleted once the picture is made");
+  assert.ok(await getMediaStore().get(rawKey), "the original is kept (never shown) so the picture can be redone");
   assert.equal(publicView(room).selfies.length, 1, "the picture is on the wall");
   assert.ok(!publicView(room).media.some((m) => m.kind === "selfie"), "selfies are not scenes");
   assert.equal(playerView(room, room.players.find((p) => p.id === hana.id)!).me.selfies![0].status, "done");
-  // limits: three each, paused, and budget
-  assert.equal((await selfie(hana)).status, 200); assert.equal((await selfie(hana)).status, 200);
-  assert.equal((await selfie(hana)).status, 409, "three selfies each");
+  // delete and redo
+  const hanaP = () => load(code).then((r) => r.players.find((p) => p.id === hana.id)!);
+  await mutate(code, async (rm) => { regenSelfie(rm, rm.players.find((p) => p.id === hana.id)!, job.id, "noir"); });
+  room = await load(code);
+  const redo = room.media.filter((m) => m.kind === "selfie" && m.playerIds[0] === hana.id).at(-1)!;
+  assert.equal(redo.style, "noir"); assert.equal(redo.refKey, rawKey, "a redo reuses the original");
+  assert.match(redo.prompt, /^film noir detective/);
+  await assert.rejects(() => mutate(code, async (rm) => { regenSelfie(rm, rm.players.find((p) => p.id === ben.id)!, job.id); }), /not one of your/, "only the owner can redo");
+  await assert.rejects(() => mutate(code, async (rm) => { await deleteSelfie(rm, rm.players.find((p) => p.id === ben.id)!, job.id); }), /not one of your/, "only the owner can delete");
+  const doneKey = (await load(code)).media.find((m) => m.id === job.id)!.key!;
+  await mutate(code, async (rm) => { await deleteSelfie(rm, rm.players.find((p) => p.id === hana.id)!, job.id); });
+  room = await load(code);
+  assert.ok(!room.media.some((m) => m.id === job.id), "the picture is gone");
+  assert.equal(await getMediaStore().get(doneKey), null, "and its file");
+  assert.ok(!publicView(room).selfies.some((s) => s.id === job.id), "and off the wall");
+  assert.ok(await getMediaStore().get(rawKey), "the original stays while the redo needs it");
+  await mutate(code, async (rm) => { await deleteSelfie(rm, rm.players.find((p) => p.id === hana.id)!, redo.id); });
+  assert.equal(await getMediaStore().get(rawKey), null, "the original goes when the last picture from it is deleted");
+  void hanaP;
+  // limits: three at a time, six made in total, paused, and budget
+  assert.equal((await selfie(hana)).status, 200); assert.equal((await selfie(hana)).status, 200); assert.equal((await selfie(hana)).status, 200);
+  assert.equal((await selfie(hana)).status, 409, "three selfies at a time");
+  for (const m of (await load(code)).media.filter((x) => x.kind === "selfie" && x.playerIds[0] === hana.id)) await mutate(code, async (rm) => { await deleteSelfie(rm, rm.players.find((p) => p.id === hana.id)!, m.id); });
+  assert.equal((await selfie(hana)).status, 200, "the sixth make is allowed");
+  for (const m of (await load(code)).media.filter((x) => x.kind === "selfie" && x.playerIds[0] === hana.id)) await mutate(code, async (rm) => { await deleteSelfie(rm, rm.players.find((p) => p.id === hana.id)!, m.id); });
+  assert.equal((await selfie(hana)).status, 409, "deleting does not reset the six-per-player limit");
   await mutate(code, (rm) => { rm.budget.plan.paused = true; });
   assert.equal((await selfie(ben)).status, 409, "paused host stops selfies");
   await mutate(code, (rm) => { rm.budget.plan.paused = false; rm.budget.capUsd = rm.budget.spentUsd; });
   assert.equal((await selfie(ben)).status, 409, "the hard budget cap stops selfies");
-  // purge removes any waiting raw selfies
+  // portraits: redo up to three times, delete any time
+  await mutate(code, (rm) => { rm.budget.plan.avatars = true; rm.budget.capUsd = 5; });
+  await mutate(code, async (rm) => { await regenAvatar(rm, rm.players.find((p) => p.id === ben.id)!); });
+  assert.equal((await load(code)).media.filter((m) => m.kind === "avatar" && m.playerIds[0] === ben.id).length, 1);
+  await assert.rejects(() => mutate(code, async (rm) => { await regenAvatar(rm, rm.players.find((p) => p.id === ben.id)!); }), /still being painted/);
+  for (let i = 0; i < 6; i++) if (!(await runNext(code)).ran) break;
+  assert.ok((await load(code)).players.find((p) => p.id === ben.id)!.profile.avatarId, "the new portrait is set");
+  await mutate(code, async (rm) => { await dropAvatar(rm, rm.players.find((p) => p.id === ben.id)!); });
+  assert.equal((await load(code)).players.find((p) => p.id === ben.id)!.profile.avatarId, undefined, "the portrait is deleted");
+  assert.equal(playerView(await load(code), (await load(code)).players.find((p) => p.id === ben.id)!).me.portraitRedos, 2);
+  // purge removes the kept originals, but only at the reveal
   await mutate(code, (rm) => { rm.budget.capUsd = 5; });
   assert.equal((await selfie(ben)).status, 200);
   const waiting = (await load(code)).media.filter((m) => m.kind === "selfie" && m.status === "queued" && m.refKey).map((m) => m.refKey!);
   assert.ok(waiting.length > 0);
   const { purgePhotos } = await import("../src/lib/engine");
   await mutate(code, async (rm) => { await purgePhotos(rm); });
+  assert.ok(await getMediaStore().get(waiting[0]), "originals are kept before the reveal");
+  await mutate(code, async (rm) => { rm.phase = "reveal"; await purgePhotos(rm); });
   for (const k of waiting) assert.equal(await getMediaStore().get(k), null, "purge deletes raw selfies");
 
   console.log("OK: play features (notebook, table chat with AI guests, selfie booth)");

@@ -70,9 +70,9 @@ Saved stories live in a separate **Stories** bucket with no expiry rule (the Med
 
 ## 4d. Selfie booth, table chat and voice calls (optional)
 
-Selfies use the same image provider and budget as portraits (each one is claimed through the spend cap), so set a budget that has room. Include one selfie and one chat message to an AI guest in the dry run, and confirm the raw selfie object is gone from the Media bucket afterward (`<code>/selfies/`). Voice calls use browser speech recognition on phones unless local services are on, so test on the phones you will use and note that iPhones need Safari or Chrome with microphone permission.
+Selfies use the same image provider and budget as portraits (each one is claimed through the spend cap), so set a budget that has room. Include one selfie and one chat message to an AI guest in the dry run, delete a selfie, redo one, and confirm the original (`<code>/selfies/`) is gone from the Media bucket after the reveal. Voice calls use browser speech recognition on phones unless local services are on, so test on the phones you will use and note that iPhones need Safari or Chrome with microphone permission.
 
-Video clips are 12 seconds on AWS by default (Nova Reel multi-shot; set `VIDEO_SECONDS` to 6, 12, 18 and so on, and note that the budget estimate scales with it), and about 18 seconds on local services (`LOCAL_VIDEO_SECONDS`). The multi-shot request shape is from documentation and has not run against real AWS. Intermission timing can be tuned with `READY_COUNTDOWN_MS`, `INTERMISSION_MIN_MS` and `INTERMISSION_MAX_MS`.
+Video clips are 12 seconds on AWS by default (Nova Reel multi-shot; set `VIDEO_SECONDS` to 6, 12, 18 and so on, and note that the budget estimate scales with it), and about 18 seconds on local services (`LOCAL_VIDEO_SECONDS`). The multi-shot request shape is from documentation and has not run against real AWS. Timing can be tuned with `READY_COUNTDOWN_MS` (default 2 minutes) and `INTERMISSION_MS` (default 5 minutes).
 
 ## 5. Party-day checklist
 

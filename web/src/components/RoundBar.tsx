@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Progress } from "@/components/kit";
+import { Avatar, MediaView } from "@/components/Media";
 import { botAudioUrl } from "@/lib/client";
 import { LAUNCH_QUIPS } from "@/lib/quips";
 import type { RecapLine, RoundView } from "@/app/_views";
@@ -80,21 +81,45 @@ function usePlayRecap(code: string, lines: RecapLine[]) {
   return { playing, play };
 }
 
-/** The break between rounds: next round's pictures render while the table looks back at what was said. */
-export function Intermission({ code, round, recap, big = false, basis }: { code: string; round: RoundView; recap: RecapLine[]; big?: boolean; basis: unknown }) {
+/** The break between rounds: next round's pictures render while the table looks at the gallery and back at what was said. */
+export function Intermission({ code, round, recap, selfies = [], roster = [], big = false, basis, skipped = false, onSkip, busy = false }: {
+  code: string; round: RoundView; recap: RecapLine[]; selfies?: { id: string; caption: string }[]; roster?: { playerName: string; characterName?: string; avatarId?: string }[];
+  big?: boolean; basis: unknown; skipped?: boolean; onSkip?: (on: boolean) => void; busy?: boolean;
+}) {
   const it = round.intermission;
-  const left = useRemaining(it?.minMs, basis);
+  const left = useRemaining(it?.remainingMs, basis);
   const [quip, setQuip] = useState(0);
   const { playing, play } = usePlayRecap(code, recap);
   useEffect(() => { setQuip(Math.floor(Math.random() * LAUNCH_QUIPS.length)); const q = setInterval(() => setQuip((n) => (n + 1) % LAUNCH_QUIPS.length), 6000); return () => clearInterval(q); }, []);
   if (!it) return null;
   const done = it.artTotal - it.artLeft, f = big ? "1.4rem" : undefined;
+  const portraits = roster.filter((r) => r.avatarId);
   return (
     <Card title="Intermission" tone="glow" data-testid="intermission" style={{ marginTop: "var(--space-3)" }}>
       <p style={{ fontSize: f, marginTop: 0 }}>Next up: <b>{it.toTitle}</b>. {it.artLeft > 0 ? "The artists are painting the next scene." : "The scene is ready."}</p>
       {it.artTotal > 0 && <Progress value={done} max={Math.max(1, it.artTotal)} label="Rendering the next round" data-testid="intermission-bar" />}
-      <p className="muted" style={{ fontSize: f }} data-testid="intermission-timer">{left && left > 0 ? `Back in about ${clock(left)} at the least.` : it.artLeft > 0 ? "Just finishing the pictures..." : "Starting..."}</p>
+      <p style={{ fontSize: f }} role="timer" data-testid="intermission-timer">Back in <b>{clock(left ?? 0)}</b>, or sooner if everyone skips.</p>
+      <p className="muted" style={{ fontSize: f }} data-testid="intermission-skips">{it.skipVotes} of {it.skipNeeded} want to skip</p>
+      {onSkip && (
+        <Button variant={skipped ? "secondary" : "primary"} disabled={busy} onClick={() => onSkip(!skipped)} data-testid="intermission-skip">
+          {skipped ? "Never mind, keep the break" : "Skip the intermission"}
+        </Button>
+      )}
       <p style={{ fontSize: f }} aria-live="polite"><i>{LAUNCH_QUIPS[quip]}</i></p>
+      {(selfies.length > 0 || portraits.length > 0) && (
+        <div data-testid="intermission-gallery" style={{ marginTop: "var(--space-3)" }}>
+          <p className="sc-eyebrow" style={{ margin: 0 }}>The gallery</p>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(auto-fill, minmax(${big ? 200 : 130}px, 1fr))`, gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
+            {selfies.slice().reverse().map((m) => <MediaView key={m.id} code={code} m={{ id: m.id, kind: "selfie", phase: "", caption: m.caption }} />)}
+            {portraits.map((r) => (
+              <figure key={r.playerName} style={{ margin: 0, textAlign: "center" }}>
+                <Avatar code={code} id={r.avatarId} size={big ? 140 : 90} alt={r.characterName ?? r.playerName} />
+                <figcaption className="muted" style={{ fontSize: "var(--text-sm)" }}>{r.characterName ?? r.playerName}</figcaption>
+              </figure>
+            ))}
+          </div>
+        </div>
+      )}
       {recap.length > 0 && (
         <div data-testid="recap" style={{ marginTop: "var(--space-3)" }}>
           <p className="sc-eyebrow" style={{ margin: 0 }}>Previously, at the table</p>

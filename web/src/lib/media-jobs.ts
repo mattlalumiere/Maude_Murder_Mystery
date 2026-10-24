@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { pricesForRoom } from "./ai/route";
 import { portraitLook } from "./backstory";
+import { getMediaStore } from "./media-store";
+import { HttpError } from "./store";
 import { imageCost, SCENE_PHASES, VIDEO_PHASES, videoCost } from "./budget";
 import type { MediaItem, Phase, Player, Room } from "./types";
 import { PHASE_INFO } from "./types";
@@ -28,6 +30,30 @@ export function queueAvatars(room: Room, only?: Player[]) {
       estCostUsd: imageCost(plan.quality, pricesForRoom(room)),
     });
   }
+}
+
+export const MAX_PORTRAIT_REDOS = 3;
+
+/** The player asks for a fresh portrait (up to three redos). The old picture is dropped. */
+export async function regenAvatar(room: Room, p: Player) {
+  if (room.budget.plan.paused) throw new HttpError(409, "Pictures are paused by the host");
+  if (!room.budget.plan.avatars) throw new HttpError(409, "Portraits are not part of this game's picture plan");
+  if ((room.avatarRedos?.[p.id] ?? 0) >= MAX_PORTRAIT_REDOS) throw new HttpError(409, "That is three portrait redos. This is the face you were born with.");
+  if (room.media.some((m) => m.kind === "avatar" && m.playerIds[0] === p.id && (m.status === "queued" || m.status === "running"))) throw new HttpError(409, "Your portrait is still being painted");
+  await dropAvatar(room, p);
+  room.avatarRedos = { ...(room.avatarRedos ?? {}), [p.id]: (room.avatarRedos?.[p.id] ?? 0) + 1 };
+  queueAvatars(room, [p]);
+  const fresh = room.media.filter((m) => m.kind === "avatar" && m.playerIds[0] === p.id).at(-1);
+  if (fresh) fresh.prompt += " A different pose and expression this time.";
+}
+
+/** Removes the player's portrait picture (their card shows a blank frame instead). */
+export async function dropAvatar(room: Room, p: Player) {
+  for (const m of room.media.filter((x) => x.kind === "avatar" && x.playerIds[0] === p.id)) {
+    if (m.key) await getMediaStore().deletePrefix(m.key).catch(() => {});
+  }
+  room.media = room.media.filter((x) => !(x.kind === "avatar" && x.playerIds[0] === p.id));
+  p.profile.avatarId = undefined;
 }
 
 function pickPlayers(room: Room, phase: Phase, n: number): Player[] {

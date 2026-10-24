@@ -67,7 +67,7 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
 
       {(inLobby || cardsPhase) && state.launch && <LaunchProgress launch={state.launch} title={inLobby ? "The host has started the game" : "Setting the stage"} />}
 
-      {state.round?.intermission && <Intermission code={code} round={state.round} recap={state.recap ?? []} basis={state} />}
+      {state.round?.intermission && <Intermission code={code} round={state.round} recap={state.recap ?? []} selfies={state.selfies} roster={state.roster} basis={state} busy={busy} skipped={me.skippedIntermission === true} onSkip={me.tracked !== false ? (on) => act({ type: "skipIntermission", skip: on }) : undefined} />}
 
       {state.round && !inLobby && !state.reveal && (
         <ReadyBar round={state.round} roster={state.roster} ready={me.ready} canUndo={me.canUndoReady === true} tracked={me.tracked !== false} busy={busy} basis={state}
@@ -100,7 +100,7 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
       )}
 
       {!inLobby && (
-        <SelfieBooth code={code} creds={creds} adult={me.ageGroup === "adult"} ok={me.selfieOk !== false} mine={me.selfies ?? []} wall={state.selfies ?? []} refresh={refresh} />
+        <SelfieBooth code={code} creds={creds} adult={me.ageGroup === "adult"} ok={me.selfieOk !== false} mine={me.selfies ?? []} wall={state.selfies ?? []} refresh={refresh} avatarId={me.avatarId} portraitRedos={me.portraitRedos ?? 0} onAction={act} busy={busy} />
       )}
 
       {state.reveal && state.storyId && <StoryVote code={code} storyId={state.storyId} creds={creds} />}

@@ -2,7 +2,9 @@ import { hostIdFromSession } from "@/auth";
 import { textModelFor } from "@/lib/ai/route";
 import { addBots, addPlayer, advance, authPlayer, beginGeneration, drinkAnswer, drinkControl, drinkDone, drinkLog, drinkWater, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, saveNotes, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
-import { hostNext, setReady } from "@/lib/rounds";
+import { dropAvatar, regenAvatar } from "@/lib/media-jobs";
+import { hostNext, setReady, voteSkip } from "@/lib/rounds";
+import { deleteSelfie, regenSelfie } from "@/lib/selfie";
 import { getStore, HttpError, mutate } from "@/lib/store";
 import type { AgeGroup, Ballot, MediaPlan } from "@/lib/types";
 
@@ -23,6 +25,9 @@ type Body =
   | { type: "removePhoto" }
   | { type: "saveNotes"; notes: string }
   | { type: "ready"; ready?: boolean }
+  | { type: "skipIntermission"; skip?: boolean }
+  | { type: "deleteSelfie" | "regenSelfie"; id: string; style?: string }
+  | { type: "regenPortrait" | "deletePortrait" }
   | { type: "ballot"; ballot: Ballot };
 
 const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos", "addBots", "setBotConfig", "drinkControl"]);
@@ -72,6 +77,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
         case "purgePhotos": await purgePhotos(room); break;
         case "removePhoto": await removePhoto(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
         case "saveNotes": saveNotes(authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.notes); break;
+        case "deleteSelfie": await deleteSelfie(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), String(body.id)); break;
+        case "regenSelfie": regenSelfie(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), String(body.id), body.style); break;
+        case "regenPortrait": await regenAvatar(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "deletePortrait": await dropAvatar(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "skipIntermission": voteSkip(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.skip !== false); break;
         case "ready": setReady(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ready !== false); break;
         case "ballot": submitBallot(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ballot); break;
         default: throw new HttpError(400, "Unknown action");

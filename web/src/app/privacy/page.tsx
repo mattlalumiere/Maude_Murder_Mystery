@@ -26,7 +26,7 @@ export default function Privacy() {
 
       <h2>Selfie booth</h2>
       <ul>
-        <li>A selfie is only used once, as a reference to make a funny AI picture (a wanted poster, a film noir detective, and so on). It is stripped of hidden details, safety-checked, and <b>deleted as soon as the picture is made</b>.</li>
+        <li>A selfie is used as a reference to make a funny AI picture (a wanted poster, a film noir detective, and so on). It is stripped of hidden details and safety-checked. Your original is kept only so you can redo the picture, is <b>never shown</b>, and is deleted when you delete your pictures, if you leave the game, and at the reveal at the latest. You can delete any picture, or your portrait, at any time and ask for a new one.</li>
         <li>The funny picture is shown to everyone in the game and on the TV, and expires with the game. Your original selfie is never shown. Names are never sent to the image service.</li>
         <li>Selfies are off for anyone under 18 unless the host turned photo likenesses on for the event and a parent or guardian agrees.</li>
       </ul>

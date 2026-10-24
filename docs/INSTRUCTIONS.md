@@ -64,7 +64,7 @@ Running late? Trim a dare. Never trim the reveal. Or use the override (below).
 - Every round, each player taps **I am ready** on their phone. A check mark appears next to their name on every screen, and the host sees the count.
 - You can take your ready back **once per round**. After that it stays.
 - When **everyone** is ready, the game moves on. When **two thirds** are ready, everyone else gets a **2 minute countdown** to get ready, then the game moves on anyway. Dropping below two thirds cancels the countdown. AI guests and players without a phone never hold the table up.
-- **Intermission:** between rounds there is a short break (at least 20 seconds, at most 90) while the next round's pictures and clips render. It replays the latest table chat and AI guest lines (with a **Play the recap aloud** button) and shows a progress bar. The host's **Next** button starts the same intermission, and pressing it again skips the wait.
+- **Intermission:** between rounds there is a **5 minute** break while the next round's pictures and clips render. It shows the gallery (everyone's selfies and portraits), replays the latest table chat and AI guest lines (with a **Play the recap aloud** button) and shows a progress bar. It ends early only if **every player taps Skip**. The host's **Next** button starts the same intermission, and pressing it again skips the wait.
 - Pausing the game freezes all of this.
 
 ## Adults-only mode (web app)
@@ -83,7 +83,7 @@ In the setup wizard, **Who is playing?** has an **Adults only (unfiltered)** swi
 - **Detective notebook:** a private notepad on your phone. It saves to the server and to your phone, and nobody else (not even the host) can read it.
 - **Table talk:** a chat for the whole table. Say an AI guest's first name ("Beatrice, where were you?") and they answer in the chat and by voice. The chat is G-rated and rate limited.
 - **Voice call (grown-ups):** tap **Call** for a hands-free conversation with an AI guest. You speak, they answer aloud, and you can interrupt them if you wear headphones (without headphones your mic is muted while they talk, so they cannot hear themselves). It is turn-taking over text, not true speech-to-speech.
-- **Selfie booth:** pick a style (wanted poster, silly mugshot, film noir, royal portrait, cartoon villain, superhero sidekick), tick the consent box, and take a selfie. The AI makes it funny and it appears on everyone's phone and the TV. Three each, and the picture budget applies. Your original is deleted once the picture is made.
+- **Selfie booth:** pick a style (wanted poster, silly mugshot, film noir, royal portrait, cartoon villain, superhero sidekick), tick the consent box, and take a selfie. The AI makes it funny and it appears on everyone's phone and the TV. Three each, and the picture budget applies. You can delete any picture (or your portrait) and ask for a new one, up to three portrait redos and six selfies in total. Your original is kept only for redos and is deleted when you delete your pictures, if you leave, and at the reveal.
 
 ## For kids and toddlers
 

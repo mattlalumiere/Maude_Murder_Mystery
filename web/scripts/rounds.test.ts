@@ -1,10 +1,9 @@
 // Ready to move on, the two-thirds countdown, and the intermission. Run: npx tsx scripts/rounds.test.ts
 process.env.READY_COUNTDOWN_MS = "300";
-process.env.INTERMISSION_MIN_MS = "60";
-process.env.INTERMISSION_MAX_MS = "400";
+process.env.INTERMISSION_MS = "400";
 import assert from "node:assert/strict";
 import { addBots, addPlayer, advance, createRoom, playerView, publicView, startGame } from "../src/lib/engine";
-import { dueNow, hostNext, readyCounts, setReady, tick } from "../src/lib/rounds";
+import { dueNow, hostNext, readyCounts, setReady, tick, voteSkip } from "../src/lib/rounds";
 import { postChat } from "../src/lib/chat";
 import { getStore, mutate } from "../src/lib/store";
 
@@ -62,29 +61,35 @@ async function main() {
   assert.ok(room.media.some((m) => m.phase === "act1" && m.kind === "scene"), "the next round's art starts rendering during the break");
   await assert.rejects(() => ready(code, 4), /Intermission/);
 
-  // the break lasts until the art is done (or the cap), and recaps the table talk
+  // the break lasts its full time (art or not) and recaps the table talk
   await mutate(code, (rm) => { postChat(rm, rm.players.find((p) => p.name === "A")!, "Where was the butler?"); });
   assert.ok(publicView(await load(code)).recap.some((l) => l.text.includes("butler")), "the break replays the conversation");
-  await sleep(80);
+  assert.ok(publicView(await load(code)).round.intermission!.remainingMs > 0);
+  await sleep(100);
   await mutate(code, (rm) => { tick(rm); });
-  assert.equal((await load(code)).phase, "cards", "art is still rendering, so it keeps waiting");
-  await mutate(code, (rm) => { rm.media.forEach((m) => { if (m.status === "queued") { m.status = "done"; } }); });
+  assert.equal((await load(code)).phase, "cards", "the break is not over yet");
+  await sleep(320);
   await mutate(code, (rm) => { tick(rm); });
   room = await load(code);
-  assert.equal(room.phase, "act1", "art done and minimum time passed, so the story moves on");
+  assert.equal(room.phase, "act1", "after the full break the story moves on");
   assert.equal(room.transition, undefined);
   assert.ok(room.players.filter((p) => !p.isBot).every((p) => !p.ready), "ready resets every round");
   assert.equal(room.readyUndo, undefined, "the one-time un-ready resets too");
   assert.equal(room.media.filter((m) => m.phase === "act1" && m.kind === "scene").length, 1, "art is not queued twice");
   assert.deepEqual(publicView(room).recap, [], "no recap outside the break");
 
-  // everyone ready: straight to the intermission, and a stuck renderer cannot hold the table past the cap
+  // everyone ready: intermission at once; it ends early only if EVERY player votes to skip
   for (let i = 0; i < 6; i++) await ready(code, i);
   room = await load(code);
   assert.ok(room.transition, "all ready starts the intermission at once");
-  await sleep(450);
-  await mutate(code, (rm) => { tick(rm); });
-  assert.equal((await load(code)).phase, "death", "the cap ends a break even if art never finishes");
+  const skip = (i: number, on = true) => mutate(code, (rm) => voteSkip(rm, rm.players.find((p) => p.id === ids(rm)[i])!, on));
+  for (let i = 0; i < 5; i++) await skip(i);
+  assert.equal(publicView(await load(code)).round.intermission!.skipVotes, 5);
+  assert.equal((await load(code)).phase, "act1", "five of six is not everyone");
+  await skip(4, false);
+  await skip(5); await skip(4);
+  assert.equal((await load(code)).phase, "death", "every player voted to skip, so it ends early");
+  assert.equal((await load(code)).transition, undefined);
 
   // host Next: intermission first, then skip; paused games never auto-advance; bare advance is unchanged
   await mutate(code, (rm) => hostNext(rm));

@@ -11,6 +11,7 @@ import { generateCase } from "./gm-ai";
 import { beginLives, fillMissingLives } from "./life";
 import { launchView } from "./launch";
 import { chatView } from "./chat";
+import { deleteAllSelfies } from "./selfie";
 import { resetRound, roundView, rosterReady } from "./rounds";
 import { applySelfCast, planCast } from "./selfcast";
 import { openStoryCase, recordPlay } from "./stories";
@@ -489,9 +490,10 @@ export function playerView(room: Room, p: Player) {
     chat: chatView(room),
     me: {
       id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, ballot: p.ballot, avatarId: p.profile.avatarId, drink: playerDrinkView(room, p),
-      canUndoReady: p.ready && !(room.readyUndo ?? []).includes(p.id), tracked: !p.isBot && p.hasDevice,
+      skippedIntermission: !!room.transition?.skip?.includes(p.id), canUndoReady: p.ready && !(room.readyUndo ?? []).includes(p.id), tracked: !p.isBot && p.hasDevice,
       notes: p.notes ?? "", pronouns: p.pronouns, selfieOk: p.ageGroup === "adult" || process.env.ALLOW_MINOR_PHOTOS === "true",
-      selfies: room.media.filter((m) => m.kind === "selfie" && m.playerIds[0] === p.id).map((m) => ({ id: m.id, status: m.status, note: m.note })),
+      selfies: room.media.filter((m) => m.kind === "selfie" && m.playerIds[0] === p.id).map((m) => ({ id: m.id, status: m.status, note: m.note, style: m.style, canRedo: !!m.refKey })),
+      portraitRedos: Math.max(0, 3 - (room.avatarRedos?.[p.id] ?? 0)),
       profile: { backstoryMode: p.profile.backstoryMode, backstory: p.profile.backstory, consent: p.profile.consent, hasPhoto: !!p.profile.photoKey },
       character: c ? { id: c.id, name: c.name, house: c.house, tease: c.tease, kid: c.kid, role: c.role, title: c.title, trait: c.trait, card: c.card } : undefined,
     },
@@ -562,7 +564,11 @@ export function saveNotes(p: Player, notes: unknown) {
 
 export async function purgePhotos(room: Room) {
   await getMediaStore().deletePrefix(`${room.code}/photos`);
-  await getMediaStore().deletePrefix(`${room.code}/selfies`);
+  // Originals kept for selfie redos go at the reveal (or when the player deletes them).
+  if (room.phase === "reveal") {
+    await getMediaStore().deletePrefix(`${room.code}/selfies`);
+    for (const m of room.media) m.refKey = undefined;
+  }
   for (const p of room.players) { p.profile.photoKey = undefined; p.profile.consent = "none"; }
 }
 
@@ -571,6 +577,7 @@ export async function kickPlayer(room: Room, playerId: string) {
   const p = room.players.find((x) => x.id === playerId);
   if (!p) return;
   if (p.profile.photoKey) await getMediaStore().deletePrefix(p.profile.photoKey);
+  await deleteAllSelfies(room, p);
   room.players = room.players.filter((x) => x.id !== playerId);
 }
 
@@ -581,8 +588,10 @@ const MEDIA_ACTIVE = new Set(["queued", "running", "polling"]);
  * reveal is reached or no later scene/video will use them. Avatar-only plans purge as soon as the portraits are done.
  */
 export function photosCanBePurged(room: Room) {
-  if (room.phase === "lobby" || !room.players.some((p) => p.profile.photoKey)) return false;
+  const selfieRefs = room.media.some((m) => m.refKey);
+  if (room.phase === "lobby" || (!room.players.some((p) => p.profile.photoKey) && !selfieRefs)) return false;
   if (room.media.some((m) => MEDIA_ACTIVE.has(m.status))) return false;
+  if (!room.players.some((p) => p.profile.photoKey)) return room.phase === "reveal"; // only selfie originals are left
   const laterArt = room.budget.plan.scenesPerAct > 0 || room.budget.plan.videoClips > 0;
   return room.phase === "reveal" || !laterArt;
 }

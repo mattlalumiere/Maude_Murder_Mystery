@@ -174,6 +174,8 @@ export interface MediaItem {
   lockUntil?: number;
   /** Selfie jobs: the raw photo to restyle. Deleted as soon as the job finishes. */
   refKey?: string;
+  /** Selfie style id, so a redo can repeat it. */
+  style?: string;
   createdAt: number;
 }
 
@@ -299,12 +301,16 @@ export interface Room {
   generating?: number;
   drinks?: DrinkState;
   botLog?: BotLine[];
+  /** Portrait redos used per player. */
+  avatarRedos?: Record<string, number>;
+  /** Selfie pictures each player has ever made (deleting one does not give the spend back). */
+  selfieMade?: Record<string, number>;
   /** Players who have used their one un-ready this round. */
   readyUndo?: string[];
   /** When the rest of the table is auto-moved on (set once two thirds are ready). */
   readyDeadline?: number;
   /** A short break between rounds while the next round's pictures render. */
-  transition?: { to: Phase; startedAt: number; minUntil: number; until: number };
+  transition?: { to: Phase; startedAt: number; until: number; skip?: string[] };
   /** The table talk: short messages between players and AI guests. */
   chat?: ChatMsg[];
   botQueue?: BotQueueItem[];

@@ -9,8 +9,8 @@ import type { Phase, Player, Room } from "./types";
 
 const num = (v: string | undefined, d: number) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v) : d);
 export const READY_COUNTDOWN_MS = () => num(process.env.READY_COUNTDOWN_MS, 120_000);
-export const INTERMISSION_MIN_MS = () => num(process.env.INTERMISSION_MIN_MS, 20_000);
-export const INTERMISSION_MAX_MS = () => num(process.env.INTERMISSION_MAX_MS, 90_000);
+/** The break between rounds lasts this long unless every player votes to skip it. */
+export const INTERMISSION_MS = () => num(process.env.INTERMISSION_MS, 300_000);
 export const READY_FRACTION = 2 / 3;
 
 /** Rounds where "ready" means something: from the cards to the accusations. */
@@ -70,7 +70,7 @@ export function beginTransition(room: Room) {
   const to = PHASES[i + 1];
   if (room.phase === "lobby" || !to) throw new HttpError(409, "The mystery is over");
   const t = now();
-  room.transition = { to, startedAt: t, minUntil: t + INTERMISSION_MIN_MS(), until: t + INTERMISSION_MAX_MS() };
+  room.transition = { to, startedAt: t, until: t + INTERMISSION_MS(), skip: [] };
   room.readyDeadline = undefined;
   queuePhaseMedia(room, to); // the next round's art starts rendering now
 }
@@ -79,7 +79,7 @@ export function beginTransition(room: Room) {
 export function dueNow(room: Room): boolean {
   if (room.paused) return false;
   const t = now();
-  return (!!room.transition && t >= room.transition.minUntil) || (!!room.readyDeadline && t >= room.readyDeadline);
+  return (!!room.transition && t >= room.transition.until) || (!!room.readyDeadline && t >= room.readyDeadline);
 }
 
 /** Driven by every poll: lets countdowns and intermissions finish without the host. */
@@ -87,11 +87,23 @@ export function tick(room: Room): boolean {
   if (room.paused) return false;
   const t = now();
   if (room.transition) {
-    if (t >= room.transition.minUntil && (pendingArt(room) === 0 || t >= room.transition.until)) { advance(room); return true; }
+    if (t >= room.transition.until) { advance(room); return true; }
     return false;
   }
   if (room.readyDeadline && t >= room.readyDeadline && READY_PHASES.includes(room.phase)) { beginTransition(room); return true; }
   return false;
+}
+
+/** A player votes to skip the break (and may take the vote back). When every player has voted, the story moves on. */
+export function voteSkip(room: Room, p: Player, on: boolean) {
+  const tr = room.transition;
+  if (!tr) throw new HttpError(409, "There is no intermission right now");
+  if (!p.hasDevice || p.isBot) throw new HttpError(403, "Not allowed");
+  const votes = new Set(tr.skip ?? []);
+  if (on) votes.add(p.id); else votes.delete(p.id);
+  tr.skip = [...votes];
+  const e = eligible(room);
+  if (e.length > 0 && e.every((x) => votes.has(x.id))) advance(room);
 }
 
 /** Host "Next": starts the intermission first, or skips it if it is already running. */
@@ -112,7 +124,8 @@ export function roundView(room: Room) {
     countdownMs: room.readyDeadline && !tr ? Math.max(0, room.readyDeadline - t) : null,
     intermission: tr ? {
       toTitle: PHASE_INFO[tr.to].title,
-      minMs: Math.max(0, tr.minUntil - t), maxMs: Math.max(0, tr.until - t),
+      remainingMs: Math.max(0, tr.until - t),
+      skipVotes: eligible(room).filter((p) => (tr.skip ?? []).includes(p.id)).length, skipNeeded: eligible(room).length,
       artLeft: pendingArt(room), artTotal: room.media.filter((m) => m.kind !== "selfie" && m.phase === tr.to).length,
     } : null,
   };
