@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Badge, Button, Card, ErrorNote, Field, Notice, Progress } from "@/components/kit";
 import { estimate, PRICES, recommend, TIERS } from "@/lib/budget";
-import { api, createGame, formatUsd, friendlyError, useAction, validateWizardStep, WIZARD_STEPS, wizardProgress } from "@/lib/client";
+import { api, createGame, formatUsd, friendlyError, sendAction, useAction, validateWizardStep, WIZARD_STEPS, wizardProgress } from "@/lib/client";
 import type { GameConfig, MediaPlan } from "@/lib/types";
 import type { StoryDetail } from "@/lib/client";
 import { AiModeCard } from "./AiModeCard";
@@ -49,14 +49,15 @@ export default function NewRoom() {
       .catch(() => setStoryErr("That saved story could not be found. You can still set up a new game."));
   }, []);
 
-  const players = cfg.expected.adults + cfg.expected.kids + cfg.expected.toddlers;
+  const [botCount, setBotCount] = useState(0);
+  const players = cfg.expected.adults + cfg.expected.kids + cfg.expected.toddlers + botCount;
   const rec = useMemo(() => recommend(budget, players), [budget, players]);
   const localAi = cfg.aiMode === "local";
   const activePlan: MediaPlan = plan ?? (localAi ? TIERS[4].plan : rec.best?.plan ?? TIERS[0].plan);
   const est = localAi ? { lines: [{ label: "Local services (no per-picture cost)", usd: 0 }], total: 0 } : estimate(activePlan, players);
   const over = est.total > budget;
   const set = <K extends keyof GameConfig>(k: K, v: GameConfig[K]) => setCfg((c) => ({ ...c, [k]: v }));
-  const input = { expected: cfg.expected, overrideCode: code, budget };
+  const input = { expected: cfg.expected, bots: botCount, overrideCode: code, budget };
   const total = WIZARD_STEPS.length;
   const prog = wizardProgress(step, total);
 
@@ -70,7 +71,11 @@ export default function NewRoom() {
     const m = validateWizardStep(4, input) || validateWizardStep(3, input);
     if (m) { setStepErr(m); return; }
     const r = await run(() => createGame({ overrideCode: code, config: cfg, capUsd: budget, plan: activePlan, ...(story ? { storyId: story.id, storyMode } : {}) }));
-    if (r) router.push(`/host/${r.code}`);
+    if (r) {
+      // AI guests are added right after the room exists, so the lobby already has them.
+      if (botCount > 0) { try { await sendAction(r.code, { type: "addBots", count: botCount }); } catch { /* the host can add them from the lobby */ } }
+      router.push(`/host/${r.code}`);
+    }
   }
 
   return (
@@ -113,6 +118,9 @@ export default function NewRoom() {
               <Counter id="adults" label="Grown-ups" hint="At least 2" value={cfg.expected.adults} min={0} max={40} onChange={(n) => set("expected", { ...cfg.expected, adults: n })} />
               <Counter id="kids" label="Kids 6 to 15" hint="Welcome!" value={cfg.expected.kids} min={0} max={30} onChange={(n) => set("expected", { ...cfg.expected, kids: n })} />
               <Counter id="toddlers" label="Little ones 1 to 5" hint="A grown-up helps" value={cfg.expected.toddlers} min={0} max={10} onChange={(n) => set("expected", { ...cfg.expected, toddlers: n })} />
+            </div>
+            <div className="sc-counts" style={{ marginTop: "var(--space-3)" }} data-testid="wizard-bots">
+              <Counter id="bots" label="AI guests" hint="Extra suspects that chat and speak. They count as grown-ups." value={botCount} min={0} max={8} onChange={setBotCount} />
             </div>
           </Card>
           <Card>
@@ -236,7 +244,7 @@ export default function NewRoom() {
           <Card title="Summary" data-testid="summary">
             <ul className="clean">
               <li>{cfg.name || "Party name: GM's pick"}, {cfg.lengthMin} min, {cfg.spice}, {cfg.drinking === "none" ? "alcohol-free" : "optional sips"}</li>
-              <li>About {players} players ({cfg.expected.adults} grown-ups, {cfg.expected.kids} kids, {cfg.expected.toddlers} little ones)</li>
+              <li>About {players} players ({cfg.expected.adults} grown-ups, {cfg.expected.kids} kids, {cfg.expected.toddlers} little ones{botCount ? `, ${botCount} AI guest${botCount === 1 ? "" : "s"}` : ""})</li>
               <li>Budget {formatUsd(budget || 0)}, estimate {formatUsd(est.total)}</li>
             </ul>
           </Card>

@@ -144,7 +144,7 @@ export default function HostConsole({ code }: { code: string }) {
             <p className="muted">Needs at least 4 players, 2 of them grown-ups. The host runs the game and is not counted unless you also join with the invite link.</p>
             {!canStart && (
               <Notice data-testid="host-start-needs">
-                Start is waiting for {startNeeds}. {state.players.length} joined so far ({adultCount} grown-up{adultCount === 1 ? "" : "s"}). Share the invite link or QR code below.
+                Start is waiting for {startNeeds}. {state.players.length} joined so far ({adultCount} grown-up{adultCount === 1 ? "" : "s"}). Share the invite link or QR code below, or add AI guests in the AI guests card to fill the room.
               </Notice>
             )}
             {state.generating && Date.now() - state.generating < (state.generationWindowMs ?? 80_000) ? (

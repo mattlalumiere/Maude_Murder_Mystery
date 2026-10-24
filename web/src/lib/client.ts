@@ -109,7 +109,7 @@ export function friendlyError(msg: string): string {
   return m;
 }
 
-export type WizardInput = { expected: { adults: number; kids: number; toddlers: number }; overrideCode: string; budget: number };
+export type WizardInput = { expected: { adults: number; kids: number; toddlers: number }; bots?: number; overrideCode: string; budget: number };
 export const WIZARD_STEPS = ["Guests", "Story", "Pictures", "Secret code"] as const;
 
 export function wizardProgress(step: number, total: number) {
@@ -119,9 +119,11 @@ export function wizardProgress(step: number, total: number) {
 /** Returns an error message for the given step (1 to 4) or an empty string when fine. */
 export function validateWizardStep(step: number, v: WizardInput): string {
   if (step === 1) {
-    const n = v.expected.adults + v.expected.kids + v.expected.toddlers;
-    if (!Number.isFinite(n) || n < 4) return "Plan for at least 4 guests so everyone gets a part.";
-    if (v.expected.adults < 2) return "At least 2 grown-ups are needed.";
+    // AI guests count as players and are cast as grown-ups.
+    const bots = v.bots ?? 0;
+    const n = v.expected.adults + v.expected.kids + v.expected.toddlers + bots;
+    if (!Number.isFinite(n) || n < 4) return "Plan for at least 4 guests so everyone gets a part. AI guests count too.";
+    if (v.expected.adults + bots < 2) return "At least 2 grown-ups are needed (AI guests count as grown-ups).";
   }
   if (step === 3 && (!Number.isFinite(v.budget) || v.budget < 0)) return "Enter a budget of 0 or more.";
   if (step === 4 && v.overrideCode.trim().length < 4) return "Your secret code needs at least 4 characters.";
