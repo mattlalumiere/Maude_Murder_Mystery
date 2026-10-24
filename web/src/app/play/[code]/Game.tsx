@@ -8,6 +8,7 @@ import { MediaView } from "@/components/Media";
 import { RulesCard } from "@/components/RulesCard";
 import { DrinkTracker } from "@/components/DrinkUi";
 import { LaunchProgress } from "@/components/LaunchProgress";
+import { Intermission, ReadyBar } from "@/components/RoundBar";
 import { StoryVote } from "@/components/StoryVote";
 import { TalkToGuests } from "@/components/TalkToGuests";
 import { TableTalk } from "@/components/TableTalk";
@@ -66,12 +67,19 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
 
       {(inLobby || cardsPhase) && state.launch && <LaunchProgress launch={state.launch} title={inLobby ? "The host has started the game" : "Setting the stage"} />}
 
+      {state.round?.intermission && <Intermission code={code} round={state.round} recap={state.recap ?? []} basis={state} />}
+
+      {state.round && !inLobby && !state.reveal && (
+        <ReadyBar round={state.round} roster={state.roster} ready={me.ready} canUndo={me.canUndoReady === true} tracked={me.tracked !== false} busy={busy} basis={state}
+          onReady={(on) => act({ type: "ready", ready: on })} />
+      )}
+
       {(cardsPhase || state.phase === "act1") && <RulesCard drinking={state.drinking} />}
 
       {me.drink && !inLobby && <DrinkTracker me={me.drink} drink={state.drink} act={act} busy={busy} />}
 
       {ch && !inLobby && (
-        <SealedCard code={code} avatarId={me.avatarId} ch={ch} canReady={cardsPhase} ready={me.ready} busy={busy} onReady={() => act({ type: "ready" })} />
+        <SealedCard code={code} avatarId={me.avatarId} ch={ch} canReady={false} ready={me.ready} busy={busy} onReady={() => act({ type: "ready" })} />
       )}
 
       {ch && !inLobby && (

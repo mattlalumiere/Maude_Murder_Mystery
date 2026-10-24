@@ -1,6 +1,7 @@
 "use client";
 import { DrinkBoard } from "@/components/DrinkUi";
 import { LaunchProgress } from "@/components/LaunchProgress";
+import { Intermission, useRemaining } from "@/components/RoundBar";
 import { RulesCard } from "@/components/RulesCard";
 import { use } from "react";
 import type { ScreenState } from "@/app/_views";
@@ -13,6 +14,7 @@ import { groupByHouse, hostName, normalizeCode, originUrl, plainText, tilt, useD
 export default function Screen({ params }: { params: Promise<{ code: string }> }) {
   const code = normalizeCode(use(params).code);
   const { state, error, status } = useRoom<ScreenState>(code, "screen");
+  const countdown = useRemaining(state?.round?.countdownMs, state);
   useTvSurface();
   useDocTitle(`Big screen ${code}`);
 
@@ -73,6 +75,10 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
           {(state.phase === "cards" || state.phase === "act1") && <RulesCard drinking={state.drinking} big />}
           {state.ballotsOpen && <p className="sc-tv-votes" data-testid="tv-ballots" role="status">Accusations in: {state.ballotsIn} of {state.totalPlayers}</p>}
           {state.phase === "cards" && state.launch && <LaunchProgress launch={state.launch} big />}
+          {state.round?.intermission && <Intermission code={code} round={state.round} recap={state.recap ?? []} big basis={state} />}
+          {state.round?.canReady && !state.reveal && state.round.total > 0 && (
+            <p className="sc-tv-votes" role="status" data-testid="tv-ready">Ready: {state.round.ready} of {state.round.total}{countdown !== null ? `, moving on in ${Math.floor(countdown / 60000)}:${String(Math.ceil((countdown % 60000) / 1000) % 60).padStart(2, "0")}` : ""}</p>
+          )}
           <DrinkBoard drink={state.drink} big />
           <BotChatter code={code} lines={state.botLog} bots={state.bots} big />
           {hero && !state.reveal && <div className="sc-tv-hero" style={{ marginTop: "var(--space-4)" }}><MediaView code={code} m={hero} /></div>}
@@ -103,7 +109,7 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
       <section aria-label="The cast" data-testid="tv-cast">
         <ul className="sc-tv-cast">
           {houses.flatMap((h) => h.members).slice(0, 12).map((r) => (
-            <li key={r.characterName}><Avatar code={code} id={r.avatarId} size={64} alt={r.characterName} /><span>{plainText(r.characterName)}<small>{plainText(r.playerName)}</small></span></li>
+            <li key={r.characterName}><Avatar code={code} id={r.avatarId} size={64} alt={r.characterName} /><span>{plainText(r.characterName)}<small>{plainText(r.playerName)}{state.round?.canReady && !r.isBot ? (r.ready ? " ✓" : " …") : ""}</small></span></li>
           ))}
         </ul>
       </section>

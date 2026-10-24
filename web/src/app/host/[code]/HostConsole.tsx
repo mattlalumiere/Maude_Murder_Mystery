@@ -187,8 +187,8 @@ export default function HostConsole({ code }: { code: string }) {
           </>
         ) : (
           <>
-            <Button size="lg" block loading={busy} disabled={last || state.paused} onClick={() => act({ type: "advance" })} data-testid="host-advance">
-              {last ? "The mystery is solved" : `Next: ${nextPhaseTitle(state.runSheet, state.phase)}`}
+            <Button size="lg" block loading={busy} disabled={last || state.paused} onClick={() => act({ type: "advance", intermission: true })} data-testid="host-advance">
+              {last ? "The mystery is solved" : state.round?.intermission ? "Skip the intermission" : `Next: ${nextPhaseTitle(state.runSheet, state.phase)}`}
             </Button>
             <div className="sc-actions" style={{ marginTop: "var(--space-3)" }}>
               <Button variant="secondary" onClick={() => act({ type: state.paused ? "resume" : "pause" })} data-testid="host-pause">{state.paused ? "Resume" : "Pause"}</Button>
@@ -253,8 +253,10 @@ export default function HostConsole({ code }: { code: string }) {
       {!lobby && (
         <>
           <Card title="The cast" style={{ marginTop: "var(--space-3)" }} data-testid="host-cast">
+            {state.round?.canReady && state.round.total > 0 && <p className="muted" data-testid="host-ready" style={{ marginTop: 0 }}>Ready: {state.round.ready} of {state.round.total}{state.round.countdownMs !== null ? ". The rest are on a countdown and the game moves on by itself." : ". Everyone ready (or two thirds plus a countdown) moves the game on."}</p>}
+            {state.round?.intermission && <p className="muted" data-testid="host-intermission" style={{ marginTop: 0 }}>Intermission: {state.round.intermission.artLeft} picture(s) still rendering for {state.round.intermission.toTitle}.</p>}
             <div className="sc-cast">{state.players.map((p) => (
-              <div key={p.id}><b>{p.characterName}</b><br /><span className="muted">{p.name}{p.ready ? ", ready" : ""}{p.ballot ? ", voted" : ""}</span></div>
+              <div key={p.id}><b>{p.characterName}</b><br /><span className="muted">{p.name}{p.isBot ? "" : p.ready ? " ✓ ready" : ""}{p.ballot ? ", voted" : ""}</span></div>
             ))}</div>
           </Card>
           <details className="sc-panel" data-testid="host-runsheet">

@@ -8,6 +8,8 @@ import { getMediaStore } from "./media-store";
 type Provider = "mock" | "bedrock";
 const useBedrock = (p?: Provider) => (p ?? process.env.MEDIA_PROVIDER) === "bedrock";
 export const IMAGE_MODEL = process.env.IMAGE_MODEL_ID ?? "amazon.nova-canvas-v1:0";
+/** Clip length. Nova Reel makes 6 s from a single prompt; 12 s or more uses its multi-shot mode. Keep in step with PRICES.videoSeconds. */
+export const VIDEO_SECONDS = Math.max(6, Math.round((Number(process.env.VIDEO_SECONDS) || 12) / 6) * 6);
 export const VIDEO_MODEL = process.env.VIDEO_MODEL_ID ?? "amazon.nova-reel-v1:1";
 
 export interface ImageRequest {
@@ -87,14 +89,16 @@ export async function startVideo(prompt: string, firstFrame: Buffer | null, capt
   const client = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
   const bucket = process.env.MEDIA_BUCKET;
   if (!bucket) throw new Error("MEDIA_BUCKET is required for video");
-  const modelInput: Record<string, unknown> = {
-    taskType: "TEXT_VIDEO",
-    textToVideoParams: {
-      text: prompt.slice(0, 500),
-      ...(firstFrame ? { images: [{ format: "jpeg", source: { bytes: firstFrame.toString("base64") } }] } : {}),
-    },
-    videoGenerationConfig: { durationSeconds: 6, fps: 24, dimension: "1280x720" },
-  };
+  const modelInput: Record<string, unknown> = VIDEO_SECONDS > 6
+    ? { taskType: "MULTI_SHOT_AUTOMATED", multiShotAutomatedParams: { text: prompt.slice(0, 4000) }, videoGenerationConfig: { durationSeconds: VIDEO_SECONDS, fps: 24, dimension: "1280x720" } }
+    : {
+        taskType: "TEXT_VIDEO",
+        textToVideoParams: {
+          text: prompt.slice(0, 500),
+          ...(firstFrame ? { images: [{ format: "jpeg", source: { bytes: firstFrame.toString("base64") } }] } : {}),
+        },
+        videoGenerationConfig: { durationSeconds: 6, fps: 24, dimension: "1280x720" },
+      };
   const out = await client.send(new StartAsyncInvokeCommand({
     modelId: VIDEO_MODEL, modelInput: modelInput as never,
     outputDataConfig: { s3OutputDataConfig: { s3Uri: `s3://${bucket}/video-out/${id}` } },

@@ -59,6 +59,14 @@ Running late? Trim a dare. Never trim the reveal. Or use the override (below).
 - In Act IV, submit a secret accusation on your phone: who did it, how, and why.
 - Scoring: killer 3, method 1, motive 1. The killer scores 5 for escaping if fewer than half the votes are right.
 
+## Moving between rounds (web app)
+
+- Every round, each player taps **I am ready** on their phone. A check mark appears next to their name on every screen, and the host sees the count.
+- You can take your ready back **once per round**. After that it stays.
+- When **everyone** is ready, the game moves on. When **two thirds** are ready, everyone else gets a **2 minute countdown** to get ready, then the game moves on anyway. Dropping below two thirds cancels the countdown. AI guests and players without a phone never hold the table up.
+- **Intermission:** between rounds there is a short break (at least 20 seconds, at most 90) while the next round's pictures and clips render. It replays the latest table chat and AI guest lines (with a **Play the recap aloud** button) and shows a progress bar. The host's **Next** button starts the same intermission, and pressing it again skips the wait.
+- Pausing the game freezes all of this.
+
 ## Adults-only mode (web app)
 
 In the setup wizard, **Who is playing?** has an **Adults only (unfiltered)** switch. It needs your confirmation that everyone is 18 or older. Then:

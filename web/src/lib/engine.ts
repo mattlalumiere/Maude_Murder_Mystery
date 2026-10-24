@@ -11,6 +11,7 @@ import { generateCase } from "./gm-ai";
 import { beginLives, fillMissingLives } from "./life";
 import { launchView } from "./launch";
 import { chatView } from "./chat";
+import { resetRound, roundView, rosterReady } from "./rounds";
 import { applySelfCast, planCast } from "./selfcast";
 import { openStoryCase, recordPlay } from "./stories";
 import { queueAvatars, queuePhaseMedia, reconcilePlan } from "./media-jobs";
@@ -296,6 +297,7 @@ export function finishGeneration(room: Room, gen: Awaited<ReturnType<typeof gene
 
 // ---------- phases ----------
 function setPhase(room: Room, phase: Phase) {
+  resetRound(room);
   room.phase = phase;
   room.phaseStartedAt = now();
   const k = room.case!;
@@ -424,7 +426,7 @@ export function publicView(room: Room) {
   const roster = k
     ? room.players.map((p) => {
         const c = k.characters.find((x) => x.id === p.characterId);
-        return { playerName: p.name, characterName: c?.name ?? "", house: c?.house ?? "", tease: c?.tease ?? "", title: c?.title ?? "", kid: c?.kid ?? false, avatarId: p.profile.avatarId };
+        return { playerName: p.name, characterName: c?.name ?? "", house: c?.house ?? "", tease: c?.tease ?? "", title: c?.title ?? "", kid: c?.kid ?? false, avatarId: p.profile.avatarId, ready: rosterReady(p), isBot: !!p.isBot };
       })
     : [];
   const clues = k
@@ -439,6 +441,8 @@ export function publicView(room: Room) {
     lobbyNames: room.players.map((p) => p.name),
     starting: !!room.generating,
     adultsOnly: room.config.adultsOnly === true,
+    round: roundView(room),
+    recap: room.transition ? recapLines(room) : [],
     drink: publicDrinkView(room),
     launch: launchView(room),
     storyId: room.storyId ?? null,
@@ -468,6 +472,16 @@ export function publicView(room: Room) {
   };
 }
 
+/** What the table said lately (chat and AI guests), replayed during the intermission. */
+function recapLines(room: Room) {
+  const lines = [
+    ...(room.chat ?? []).map((m) => ({ id: m.id, who: m.name, text: m.text, bot: !!m.bot, botId: m.from, audio: false, ts: m.ts })),
+    ...(room.botLog ?? []).map((l) => ({ id: l.id, who: l.speaker, text: l.text, bot: true, botId: l.botId, audio: !!l.audioKey, ts: l.ts })),
+  ];
+  const seen = new Set<string>();
+  return lines.sort((a, b) => a.ts - b.ts).filter((l) => { const k = `${l.who}|${l.text}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(-8);
+}
+
 export function playerView(room: Room, p: Player) {
   const c = room.case?.characters.find((x) => x.id === p.characterId);
   return {
@@ -475,6 +489,7 @@ export function playerView(room: Room, p: Player) {
     chat: chatView(room),
     me: {
       id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, ballot: p.ballot, avatarId: p.profile.avatarId, drink: playerDrinkView(room, p),
+      canUndoReady: p.ready && !(room.readyUndo ?? []).includes(p.id), tracked: !p.isBot && p.hasDevice,
       notes: p.notes ?? "", pronouns: p.pronouns, selfieOk: p.ageGroup === "adult" || process.env.ALLOW_MINOR_PHOTOS === "true",
       selfies: room.media.filter((m) => m.kind === "selfie" && m.playerIds[0] === p.id).map((m) => ({ id: m.id, status: m.status, note: m.note })),
       profile: { backstoryMode: p.profile.backstoryMode, backstory: p.profile.backstory, consent: p.profile.consent, hasPhoto: !!p.profile.photoKey },

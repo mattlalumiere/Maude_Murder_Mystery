@@ -15,8 +15,8 @@ FFMPEG = os.getenv("FFMPEG", "ffmpeg")
 
 
 class Req(BaseModel):
-    frames_b64: List[str] = Field(min_length=1, max_length=8)
-    seconds: float = Field(default=6.0, ge=2.0, le=20.0)
+    frames_b64: List[str] = Field(min_length=1, max_length=10)
+    seconds: float = Field(default=6.0, ge=2.0, le=30.0)
     fps: int = Field(default=24, ge=8, le=30)
     width: int = Field(default=1024, ge=256, le=1920)
     height: int = Field(default=576, ge=144, le=1080)

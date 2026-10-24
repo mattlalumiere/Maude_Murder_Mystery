@@ -2,12 +2,13 @@ import { hostIdFromSession } from "@/auth";
 import { textModelFor } from "@/lib/ai/route";
 import { addBots, addPlayer, advance, authPlayer, beginGeneration, drinkAnswer, drinkControl, drinkDone, drinkLog, drinkWater, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, saveNotes, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
+import { hostNext, setReady } from "@/lib/rounds";
 import { getStore, HttpError, mutate } from "@/lib/store";
 import type { AgeGroup, Ballot, MediaPlan } from "@/lib/types";
 
 type Body =
   | { type: "start" }
-  | { type: "advance" }
+  | { type: "advance"; intermission?: boolean }
   | { type: "pause" | "resume" }
   | { type: "addPlayer"; name: string; ageGroup: AgeGroup }
   | { type: "kick"; playerId: string }
@@ -21,7 +22,7 @@ type Body =
   | { type: "purgePhotos" }
   | { type: "removePhoto" }
   | { type: "saveNotes"; notes: string }
-  | { type: "ready" }
+  | { type: "ready"; ready?: boolean }
   | { type: "ballot"; ballot: Ballot };
 
 const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos", "addBots", "setBotConfig", "drinkControl"]);
@@ -46,7 +47,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
           else { await startGame(room); out = { generating: false }; }
           break;
         }
-        case "advance": advance(room); break;
+        // The host console asks for the intermission; a bare "advance" moves on at once (kept for scripts and tests).
+        case "advance": if (body.intermission) hostNext(room); else advance(room); break;
         case "pause": room.paused = true; break;
         case "resume": room.paused = false; break;
         case "addPlayer": {
@@ -70,7 +72,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
         case "purgePhotos": await purgePhotos(room); break;
         case "removePhoto": await removePhoto(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
         case "saveNotes": saveNotes(authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.notes); break;
-        case "ready": authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")).ready = true; break;
+        case "ready": setReady(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ready !== false); break;
         case "ballot": submitBallot(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ballot); break;
         default: throw new HttpError(400, "Unknown action");
       }

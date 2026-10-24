@@ -57,7 +57,7 @@ export const localImageModel: ImageModel = {
 export async function localVideo(frames: Buffer[], seconds: number, narration?: Buffer): Promise<{ bytes: Buffer; mime: string }> {
   return bytes(await callTool<B64>("generate_video", {
     frames_b64: frames.map((f) => f.toString("base64")), seconds, ...(narration ? { narration_b64: narration.toString("base64") } : {}),
-  }, 170_000));
+  }, 290_000));
 }
 
 export async function localTranscribe(audio: Buffer, mime: string): Promise<string> {

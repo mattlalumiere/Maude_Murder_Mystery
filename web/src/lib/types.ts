@@ -299,6 +299,12 @@ export interface Room {
   generating?: number;
   drinks?: DrinkState;
   botLog?: BotLine[];
+  /** Players who have used their one un-ready this round. */
+  readyUndo?: string[];
+  /** When the rest of the table is auto-moved on (set once two thirds are ready). */
+  readyDeadline?: number;
+  /** A short break between rounds while the next round's pictures render. */
+  transition?: { to: Phase; startedAt: number; minUntil: number; until: number };
   /** The table talk: short messages between players and AI guests. */
   chat?: ChatMsg[];
   botQueue?: BotQueueItem[];

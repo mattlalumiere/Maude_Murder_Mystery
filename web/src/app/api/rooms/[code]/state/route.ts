@@ -1,14 +1,17 @@
 import { hostIdFromSession } from "@/auth";
 import { authPlayer, hostView, playerView, publicView } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
-import { getStore, HttpError } from "@/lib/store";
+import { dueNow, tick } from "@/lib/rounds";
+import { getStore, HttpError, mutate } from "@/lib/store";
 
 export async function GET(req: Request, ctx: { params: Promise<{ code: string }> }) {
   return handle(async () => {
     const { code } = await ctx.params;
     const url = new URL(req.url);
-    const room = await getStore().get(code.toUpperCase());
+    let room = await getStore().get(code.toUpperCase());
     if (!room) throw new HttpError(404, "Room not found");
+    // Countdowns and intermissions finish on their own: whoever polls next moves the story along.
+    if (dueNow(room)) { try { room = (await mutate(code.toUpperCase(), (r) => { tick(r); })).room; } catch { /* the next poll tries again */ } }
     const role = url.searchParams.get("role") ?? "screen";
     const since = Number(url.searchParams.get("v") ?? -1);
     if (since === room.version) return json({ unchanged: true, version: room.version });

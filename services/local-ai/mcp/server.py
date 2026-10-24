@@ -160,10 +160,10 @@ async def _image(body: dict) -> dict:
 
 
 @mcp.tool()
-async def generate_video(frames_b64: list[str], seconds: float = 6.0, narration_b64: Optional[str] = None) -> dict:
+async def generate_video(frames_b64: list[str], seconds: float = 18.0, narration_b64: Optional[str] = None) -> dict:
     """Make a short MP4 from still frames (slow zoom and fades), with optional narration audio. Returns {mime, data_b64}."""
-    if not 1 <= len(frames_b64) <= 8:
-        raise ValueError("1 to 8 frames")
+    if not 1 <= len(frames_b64) <= 10:
+        raise ValueError("1 to 10 frames")
     for f in frames_b64:
         _check_b64(f, "frame")
     body: dict = {"frames_b64": frames_b64, "seconds": seconds}

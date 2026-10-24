@@ -8,7 +8,9 @@ export type DrinkPublic = { paused: boolean; stopped: boolean; round: DrinkRound
 export type DrinkMe = { mode: "in" | "out"; limit: number; units: number; water: number; atLimit: boolean; paceHold: boolean; pending: DrinkRoundView | null };
 export type DrinkHost = { paused: boolean; stopped: boolean; players: { id: string; name: string; mode: "in" | "out"; limit: number; units: number; water: number; done: boolean }[] };
 
-export type BotCommon = { adultsOnly?: boolean; selfies?: { id: string; caption: string }[]; launch?: LaunchView | null; drink?: DrinkPublic; storyId?: string | null; stt?: "server" | "browser"; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
+export type RoundView = { canReady: boolean; ready: number; total: number; needed: number; countdownMs: number | null; intermission: { toTitle: string; minMs: number; maxMs: number; artLeft: number; artTotal: number } | null };
+export type RecapLine = { id: string; who: string; text: string; bot: boolean; botId: string; audio: boolean; ts: number };
+export type BotCommon = { round?: RoundView; recap?: RecapLine[]; adultsOnly?: boolean; selfies?: { id: string; caption: string }[]; launch?: LaunchView | null; drink?: DrinkPublic; storyId?: string | null; stt?: "server" | "browser"; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
 
 export type MediaItemView = { id: string; kind: string; phase: string; caption: string; mime?: string };
 
@@ -35,11 +37,11 @@ export type PlayerState = BotCommon & {
   starting?: boolean; drinking?: "adults" | "heavy" | "none";
   lobbyNames: string[]; clues: { id: string; text: string }[]; ballotsOpen: boolean;
   ballotOptions?: { suspects: Opt[]; methods: Opt[]; motives: Opt[] };
-  roster: { playerName: string; characterName: string; house: string; tease: string }[];
+  roster: { playerName: string; characterName: string; house: string; tease: string; ready?: boolean; isBot?: boolean }[];
   reveal?: { killer?: string; method?: string; motive?: string; story: string; scores: { name: string; points: number; detail: string }[]; awards: { award: string; to: string }[] };
   media: MediaItemView[];
   me: {
-    selfieOk?: boolean; notes?: string; pronouns?: "he" | "she" | "they"; selfies?: { id: string; status: string; note?: string }[];
+    canUndoReady?: boolean; tracked?: boolean; selfieOk?: boolean; notes?: string; pronouns?: "he" | "she" | "they"; selfies?: { id: string; status: string; note?: string }[];
     id: string; name: string; ageGroup: string; ready: boolean; avatarId?: string; drink?: DrinkMe; profile: { hasPhoto: boolean; consent: string };
     ballot?: { killerId: string; methodId: string; motiveId: string };
     character?: { name: string; house: string; tease: string; role: string; title?: string; trait?: string; card: CharacterCard };
@@ -50,7 +52,7 @@ export type ScreenState = BotCommon & {
   version: number; code: string; phase: string; phaseTitle: string; paused: boolean; narration?: string; title?: string; setting?: string;
   starting?: boolean; drinking?: "adults" | "heavy" | "none";
   lobbyNames: string[]; clues: { id: string; round: number; text: string }[];
-  roster: { playerName: string; characterName: string; house: string; tease: string; avatarId?: string }[];
+  roster: { playerName: string; characterName: string; house: string; tease: string; avatarId?: string; ready?: boolean; isBot?: boolean }[];
   partyName: string; media: MediaItemView[];
   ballotsIn: number; totalPlayers: number; ballotsOpen: boolean;
   reveal?: { killer?: string; method?: string; motive?: string; story: string; scores: { name: string; points: number }[]; awards: { award: string; to: string }[] };

@@ -7,7 +7,7 @@ export const PRICES = {
   imageStandard: 0.04, // Nova Canvas, standard quality, up to 1024x1024
   imagePremium: 0.06, // Nova Canvas, premium quality
   videoPerSecond: 0.08, // Nova Reel, 720p
-  videoSeconds: 6, // one clip
+  videoSeconds: 12, // one clip (Nova Reel multi-shot, 12 to 120 s in steps of 6)
   moderationPerPhoto: 0.001, // Rekognition image moderation
   contingency: 0.15, // keep 15% of the budget unspent as a safety margin
   botChat: 0.004, // one AI guest reply or chatter line (small text model call)

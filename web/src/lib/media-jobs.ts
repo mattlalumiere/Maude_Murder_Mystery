@@ -43,6 +43,7 @@ function pickPlayers(room: Room, phase: Phase, n: number): Player[] {
 }
 
 export function queuePhaseMedia(room: Room, phase: Phase) {
+  if (room.media.some((m) => m.phase === phase && (m.kind === "scene" || m.kind === "video"))) return; // already queued (the intermission starts it early)
   const plan = room.budget.plan;
   const k = room.case!;
   const setting = k.setting.split(/(?<=[.!?])\s/)[0] ?? "";

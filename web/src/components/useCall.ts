@@ -20,8 +20,12 @@ export function micProblem(e: unknown): string {
   const name = (e as { name?: string })?.name ?? "";
   if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone was found on this device. Type instead.";
   if (name === "NotReadableError" || name === "AbortError") return "The microphone is busy in another app. Close it and try again.";
-  return "This browser did not allow the microphone. If you are inside an app's built-in browser (like the Claude app's preview pane), open the game in Chrome or Safari instead, then allow the microphone when asked.";
+  return `This browser did not allow the microphone${name ? ` (${name})` : ""}. In Brave or Chrome, click the lock icon beside the address bar, set Microphone to Allow, and reload. Inside an app's built-in browser (like the Claude app's preview pane), open the game in a normal browser instead.`;
 }
+
+/** The microphone works, but the browser's own speech-to-text service refused or could not be reached. */
+export const speechServiceProblem = (code: string) =>
+  `Your microphone is allowed, but this browser's speech-to-text service is not (${code}). Brave blocks it by default because it sends audio to Google. Use Chrome, Edge or Safari for the voice call, or ask the host to play with Local services, which transcribes on the host's own computer.`;
 
 export type CallState = "off" | "listening" | "thinking" | "speaking";
 
@@ -49,6 +53,7 @@ export function useCall({ code, creds, stt, onHeard, speaking, interrupt, headph
   const speakingRef = useRef(speaking);
   const headphonesRef = useRef(headphones);
   const busy = useRef(false);
+  const micGranted = useRef(false);
   const rec = useRef<SR | null>(null);
   const vad = useRef<{ stop: () => void } | null>(null);
   const heard = useRef(onHeard);
@@ -91,8 +96,10 @@ export function useCall({ code, creds, stt, onHeard, speaking, interrupt, headph
       }
     };
     r.onerror = (e) => {
-      if (e.error === "service-not-allowed" || e.error === "network") { setError("This browser's speech recognition is not available here. Try Chrome or Safari, or type instead."); stopAll(); }
-      else if (e.error === "not-allowed") { setError(micProblem(e)); stopAll(); }
+      if (e.error === "service-not-allowed" || e.error === "network" || e.error === "not-allowed" || e.error === "language-not-supported") {
+        // We already asked for the microphone and got it, so a refusal here is the speech service, not the mic.
+        setError(micGranted.current ? speechServiceProblem(e.error) : micProblem(e)); stopAll();
+      }
     };
     r.onend = () => { if (active.current) { try { r.start(); } catch { /* already running */ } } };  // browsers end sessions on silence; keep the line open
     r.start();
@@ -138,7 +145,7 @@ export function useCall({ code, creds, stt, onHeard, speaking, interrupt, headph
   }, [code, creds, say]);
 
   const start = useCallback(async () => {
-    setError("");
+    setError(""); micGranted.current = false;
     if (active.current) return;
     active.current = true; setState("listening");
     try {
@@ -146,6 +153,7 @@ export function useCall({ code, creds, stt, onHeard, speaking, interrupt, headph
         // Ask for the microphone ourselves first, so the browser shows its permission prompt and a refusal is explained.
         if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error("insecure");
         (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop());
+        micGranted.current = true;
         if (active.current) startBrowser();
       } else await startServer();
     } catch (e) { setError(micProblem(e)); stopAll(); }

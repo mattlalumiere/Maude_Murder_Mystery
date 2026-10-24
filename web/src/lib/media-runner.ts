@@ -8,7 +8,7 @@ import { photosCanBePurged, purgePhotos } from "./engine";
 import { getStore, mutate } from "./store";
 import type { MediaItem, Room } from "./types";
 
-const LOCK_MS = 120_000;
+const LOCK_MS = 300_000; // a long local clip renders several keyframes first
 const POLL_EVERY_MS = 8_000;
 
 const ext = (mime: string) => (mime === "image/png" ? "png" : mime === "image/svg+xml" ? "svg" : mime === "video/mp4" ? "mp4" : "bin");
@@ -109,9 +109,11 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
 
 /** A short clip from a few keyframes of the scene, a slow zoom between them, and the narration read aloud when a voice is available. */
 async function makeLocalVideo(room: Room, job: MediaItem, refs: Buffer[]): Promise<{ bytes: Buffer; mime: string; prompt: string }> {
-  const n = Math.max(1, Math.min(6, Number(process.env.LOCAL_VIDEO_FRAMES) || 3));
+  // About 3 seconds per keyframe: the clip is long enough for the narration and a few shots.
+  const seconds = Math.max(6, Math.min(30, Number(process.env.LOCAL_VIDEO_SECONDS) || 18));
+  const n = Math.max(1, Math.min(10, Number(process.env.LOCAL_VIDEO_FRAMES) || Math.ceil(seconds / 3)));
   const base = await directPrompt(room, job, textModelFor(room));
-  const shots = ["wide establishing shot of the whole room", "closer on the characters reacting", "the dramatic moment, expressive faces", "a quiet beat, one detail in focus", "an over-the-shoulder view", "a last wide shot"];
+  const shots = ["wide establishing shot of the whole room", "closer on the characters reacting", "the dramatic moment, expressive faces", "a quiet beat, one detail in focus", "an over-the-shoulder view", "a close-up on a clue", "the crowd reacting together", "a slow pull-back", "a last wide shot"];
   const image = imageModelFor(room);
   const frames: Buffer[] = [];
   for (let i = 0; i < n; i++) {
@@ -124,6 +126,6 @@ async function makeLocalVideo(room: Room, job: MediaItem, refs: Buffer[]): Promi
   if (speech.kind === "server" && line) {
     try { narration = (await speech.synthesize(line.slice(0, 300), speech.voices[0])).bytes; } catch { /* silent clip */ }
   }
-  const v = await localVideo(frames, 6, narration);
+  const v = await localVideo(frames, seconds, narration);
   return { ...v, prompt: base.prompt };
 }
