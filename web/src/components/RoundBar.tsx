@@ -91,7 +91,7 @@ export function Intermission({ code, round, recap, selfies = [], roster = [], bi
   const [quip, setQuip] = useState(0);
   const { playing, play } = usePlayRecap(code, recap);
   useEffect(() => { setQuip(Math.floor(Math.random() * LAUNCH_QUIPS.length)); const q = setInterval(() => setQuip((n) => (n + 1) % LAUNCH_QUIPS.length), 6000); return () => clearInterval(q); }, []);
-  if (!it) return null;
+  if (!it || it.stage === "gm") return null;
   const done = it.artTotal - it.artLeft, f = big ? "1.4rem" : undefined;
   const portraits = roster.filter((r) => r.avatarId);
   return (
@@ -130,5 +130,35 @@ export function Intermission({ code, round, recap, selfies = [], roster = [], bi
         </div>
       )}
     </Card>
+  );
+}
+
+/** The Game Master's message: one lone screen that moves the story along before the break begins. */
+export function GmMessage({ round, big = false, basis }: { round: RoundView; big?: boolean; basis: unknown }) {
+  const it = round.intermission;
+  const left = useRemaining(it?.remainingMs, basis);
+  const [spoken, setSpoken] = useState(false);
+  const text = it?.gm?.text ?? "";
+  function speak() {
+    try {
+      if (!("speechSynthesis" in window)) return;
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text); u.rate = 0.95; u.pitch = 0.8;
+      u.onend = () => setSpoken(false); setSpoken(true);
+      window.speechSynthesis.speak(u);
+    } catch { /* silent */ }
+  }
+  useEffect(() => () => { try { window.speechSynthesis?.cancel(); } catch { /* ignore */ } }, []);
+  if (!it?.gm) return null;
+  return (
+    <main className={big ? "sc-tv" : "sc-page"} data-testid="gm-message" style={{ display: "grid", placeItems: "center", minHeight: "100vh", textAlign: "center", padding: "var(--space-5)" }}>
+      <div style={{ maxWidth: big ? 1100 : 560 }}>
+        <p className="sc-eyebrow">A message from the Game Master</p>
+        <h1 style={{ fontSize: big ? "clamp(2.5rem,5vw,4.5rem)" : undefined }} data-testid="gm-title">{it.gm.title}</h1>
+        <p style={{ fontSize: big ? "clamp(1.5rem,2.6vw,2.4rem)" : "1.25rem", lineHeight: 1.5 }} data-testid="gm-text">{it.gm.text}</p>
+        <p className="muted" role="timer" data-testid="gm-timer">The intermission begins in {clock(left ?? 0)}.</p>
+        <Button variant="secondary" onClick={speak} disabled={spoken} data-testid="gm-speak">{spoken ? "Reading..." : "Read it aloud"}</Button>
+      </div>
+    </main>
   );
 }

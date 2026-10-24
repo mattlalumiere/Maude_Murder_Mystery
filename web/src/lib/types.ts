@@ -310,7 +310,7 @@ export interface Room {
   /** When the rest of the table is auto-moved on (set once two thirds are ready). */
   readyDeadline?: number;
   /** A short break between rounds while the next round's pictures render. */
-  transition?: { to: Phase; startedAt: number; until: number; skip?: string[] };
+  transition?: { to: Phase; startedAt: number; until: number; skip?: string[]; stage: "gm" | "break"; gmUntil: number };
   /** The table talk: short messages between players and AI guests. */
   chat?: ChatMsg[];
   botQueue?: BotQueueItem[];

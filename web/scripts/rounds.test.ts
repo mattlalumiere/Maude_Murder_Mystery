@@ -1,6 +1,7 @@
 // Ready to move on, the two-thirds countdown, and the intermission. Run: npx tsx scripts/rounds.test.ts
 process.env.READY_COUNTDOWN_MS = "300";
 process.env.INTERMISSION_MS = "400";
+process.env.GM_MESSAGE_MS = "150";
 import assert from "node:assert/strict";
 import { addBots, addPlayer, advance, createRoom, playerView, publicView, startGame } from "../src/lib/engine";
 import { dueNow, hostNext, readyCounts, setReady, tick, voteSkip } from "../src/lib/rounds";
@@ -58,6 +59,9 @@ async function main() {
   assert.equal(room.phase, "cards", "the intermission comes first");
   assert.ok(room.transition && room.transition.to === "act1");
   assert.equal(publicView(room).round.intermission?.toTitle.length! > 0, true);
+  assert.equal(room.transition.stage, "gm", "the Game Master speaks first, on a lone screen");
+  assert.ok(publicView(room).round.intermission!.gm!.text.length > 20, "the GM message moves the story along");
+  await assert.rejects(() => mutate(code, (rm) => voteSkip(rm, rm.players.find((p) => p.id === ids(rm)[0])!, true)), /Game Master is speaking/);
   assert.ok(room.media.some((m) => m.phase === "act1" && m.kind === "scene"), "the next round's art starts rendering during the break");
   await assert.rejects(() => ready(code, 4), /Intermission/);
 
@@ -65,10 +69,17 @@ async function main() {
   await mutate(code, (rm) => { postChat(rm, rm.players.find((p) => p.name === "A")!, "Where was the butler?"); });
   assert.ok(publicView(await load(code)).recap.some((l) => l.text.includes("butler")), "the break replays the conversation");
   assert.ok(publicView(await load(code)).round.intermission!.remainingMs > 0);
+  await sleep(60);
+  await mutate(code, (rm) => { tick(rm); });
+  assert.equal((await load(code)).transition!.stage, "gm", "still the GM message");
+  await sleep(120);
+  await mutate(code, (rm) => { tick(rm); });
+  assert.equal((await load(code)).transition!.stage, "break", "then the break begins");
+  assert.equal(publicView(await load(code)).round.intermission!.gm, null);
   await sleep(100);
   await mutate(code, (rm) => { tick(rm); });
   assert.equal((await load(code)).phase, "cards", "the break is not over yet");
-  await sleep(320);
+  await sleep(330);
   await mutate(code, (rm) => { tick(rm); });
   room = await load(code);
   assert.equal(room.phase, "act1", "after the full break the story moves on");
@@ -82,6 +93,9 @@ async function main() {
   for (let i = 0; i < 6; i++) await ready(code, i);
   room = await load(code);
   assert.ok(room.transition, "all ready starts the intermission at once");
+  await sleep(170);
+  await mutate(code, (rm) => { tick(rm); });
+  assert.equal((await load(code)).transition!.stage, "break");
   const skip = (i: number, on = true) => mutate(code, (rm) => voteSkip(rm, rm.players.find((p) => p.id === ids(rm)[i])!, on));
   for (let i = 0; i < 5; i++) await skip(i);
   assert.equal(publicView(await load(code)).round.intermission!.skipVotes, 5);
@@ -94,6 +108,9 @@ async function main() {
   // host Next: intermission first, then skip; paused games never auto-advance; bare advance is unchanged
   await mutate(code, (rm) => hostNext(rm));
   assert.ok((await load(code)).transition);
+  assert.equal((await load(code)).transition!.stage, "gm");
+  await mutate(code, (rm) => hostNext(rm));
+  assert.equal((await load(code)).transition!.stage, "break", "Next skips the GM message");
   await mutate(code, (rm) => hostNext(rm));
   assert.equal((await load(code)).phase, "act2", "Next again skips the break");
   await mutate(code, (rm) => { rm.paused = true; rm.readyDeadline = Date.now() - 1; });

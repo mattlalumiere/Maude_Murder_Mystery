@@ -64,7 +64,8 @@ Running late? Trim a dare. Never trim the reveal. Or use the override (below).
 - Every round, each player taps **I am ready** on their phone. A check mark appears next to their name on every screen, and the host sees the count.
 - You can take your ready back **once per round**. After that it stays.
 - When **everyone** is ready, the game moves on. When **two thirds** are ready, everyone else gets a **2 minute countdown** to get ready, then the game moves on anyway. Dropping below two thirds cancels the countdown. AI guests and players without a phone never hold the table up.
-- **Intermission:** between rounds there is a **5 minute** break while the next round's pictures and clips render. It shows the gallery (everyone's selfies and portraits), replays the latest table chat and AI guest lines (with a **Play the recap aloud** button) and shows a progress bar. It ends early only if **every player taps Skip**. The host's **Next** button starts the same intermission, and pressing it again skips the wait.
+- **The Game Master speaks first.** Between rounds, every phone and the TV show a lone full-screen message from the GM (about 30 seconds) that moves the story to the next round, with a **Read it aloud** button.
+- **Intermission:** after that message there is a **5 minute** break while the next round's pictures and clips render. It shows the gallery (everyone's selfies and portraits), replays the latest table chat and AI guest lines (with a **Play the recap aloud** button) and shows a progress bar. It ends early only if **every player taps Skip**. The host's **Next** button starts the same intermission, and pressing it again skips the wait.
 - Pausing the game freezes all of this.
 
 ## Adults-only mode (web app)

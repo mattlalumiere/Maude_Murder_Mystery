@@ -1,7 +1,7 @@
 "use client";
 import { DrinkBoard } from "@/components/DrinkUi";
 import { LaunchProgress } from "@/components/LaunchProgress";
-import { Intermission, useRemaining } from "@/components/RoundBar";
+import { GmMessage, Intermission, useRemaining } from "@/components/RoundBar";
 import { RulesCard } from "@/components/RulesCard";
 import { use } from "react";
 import type { ScreenState } from "@/app/_views";
@@ -27,6 +27,8 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
       </main>
     );
   }
+
+  if (state.round?.intermission?.stage === "gm") return <GmMessage round={state.round} big basis={state} />;
 
   const lobby = state.phase === "lobby";
   const joinUrl = `${originUrl()}/join/${state.code}`;

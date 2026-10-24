@@ -8,7 +8,7 @@ import { MediaView } from "@/components/Media";
 import { RulesCard } from "@/components/RulesCard";
 import { DrinkTracker } from "@/components/DrinkUi";
 import { LaunchProgress } from "@/components/LaunchProgress";
-import { Intermission, ReadyBar } from "@/components/RoundBar";
+import { GmMessage, Intermission, ReadyBar } from "@/components/RoundBar";
 import { StoryVote } from "@/components/StoryVote";
 import { TalkToGuests } from "@/components/TalkToGuests";
 import { TableTalk } from "@/components/TableTalk";
@@ -39,6 +39,7 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
       </main>
     );
   }
+  if (state.round?.intermission?.stage === "gm") return <GmMessage round={state.round} basis={state} />;
   const { me } = state;
   const ch = me.character;
   const inLobby = state.phase === "lobby";

@@ -188,7 +188,7 @@ export default function HostConsole({ code }: { code: string }) {
         ) : (
           <>
             <Button size="lg" block loading={busy} disabled={last || state.paused} onClick={() => act({ type: "advance", intermission: true })} data-testid="host-advance">
-              {last ? "The mystery is solved" : state.round?.intermission ? "Skip the intermission" : `Next: ${nextPhaseTitle(state.runSheet, state.phase)}`}
+              {last ? "The mystery is solved" : state.round?.intermission ? (state.round.intermission.stage === "gm" ? "Skip the GM message" : "Skip the intermission") : `Next: ${nextPhaseTitle(state.runSheet, state.phase)}`}
             </Button>
             <div className="sc-actions" style={{ marginTop: "var(--space-3)" }}>
               <Button variant="secondary" onClick={() => act({ type: state.paused ? "resume" : "pause" })} data-testid="host-pause">{state.paused ? "Resume" : "Pause"}</Button>
