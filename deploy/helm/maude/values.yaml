@@ -1,0 +1,182 @@
+# Defaults are safe and portable. Cloud specifics live in values-<cloud>.yaml.
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: maude-web
+  tag: latest
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# One chart release is one cell.
+cell:
+  id: local-0
+  region: local
+
+replicaCount: 3
+
+# Non-secret environment (see docs/platform/CONTRACT.md env table).
+config:
+  STORE_ADAPTER: postgres
+  MEDIA_ADAPTER: s3
+  AI_TEXT_ADAPTER: openai-compatible
+  MEDIA_PROVIDER: mock
+  GAME_TTL_HOURS: "24"
+  LOG_LEVEL: info
+  AI_TIMEOUT_MS: "60000"
+  AI_MAX_OUTPUT_TOKENS: "4096"
+  S3_ENDPOINT: ""
+  S3_REGION: ""
+  S3_BUCKET: ""
+  S3_FORCE_PATH_STYLE: "false"
+  AI_BASE_URL: ""
+  AI_MODEL: ""
+extraEnv: []
+
+# Secrets are never in the chart. Choose one source.
+# mode: existing  -> reference a Secret that already exists (created by external-secrets, CSI sync, or by hand)
+# mode: externalSecrets -> render an ExternalSecret that pulls remote keys into that Secret
+# mode: none -> no secret env at all (kind with file adapters)
+secrets:
+  mode: existing
+  secretName: maude-secrets
+  # Keys expected in the Secret, exposed as env vars of the same name.
+  keys:
+    - DATABASE_URL
+    - AUTH_SECRET
+    - AI_API_KEY
+    - CLEANUP_TOKEN
+  externalSecrets:
+    apiVersion: external-secrets.io/v1beta1
+    secretStoreRef:
+      kind: ClusterSecretStore
+      name: maude
+    refreshInterval: 1h
+    # envName -> remote key name in the secret manager (names only, no values)
+    remoteKeys:
+      DATABASE_URL: maude/database-url
+      AUTH_SECRET: maude/auth-secret
+      AI_API_KEY: maude/ai-api-key
+      CLEANUP_TOKEN: maude/cleanup-token
+
+serviceAccount:
+  create: true
+  name: ""
+  # IRSA:  eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/ROLE
+  # AKS:   azure.workload.identity/client-id: CLIENT_ID
+  # GKE:   iam.gke.io/gcp-service-account: SA@PROJECT.iam.gserviceaccount.com
+  annotations: {}
+  # AKS workload identity also needs this pod label.
+podLabels: {}
+podAnnotations: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 3000
+
+ingress:
+  enabled: false
+  className: traefik
+  annotations: {}
+  hosts:
+    - host: maude.example.com
+      path: /
+      pathType: Prefix
+  tls:
+    enabled: false
+    secretName: maude-tls
+    # cert-manager: set clusterIssuer to add cert-manager.io/cluster-issuer
+    clusterIssuer: ""
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 512Mi
+  limits:
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 36
+  # docs/platform/scale/capacity-model.md plans 24 pods per 2,000 game cell at 50% utilisation.
+  targetCPUUtilizationPercentage: 55
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+priorityClass:
+  create: false
+  name: maude-web
+  value: 1000
+  # Set existingName to use a class created elsewhere.
+  existingName: ""
+
+topologySpread:
+  enabled: true
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+probes:
+  startup:
+    path: /api/healthz
+    failureThreshold: 30
+    periodSeconds: 2
+  liveness:
+    path: /api/healthz
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+  readiness:
+    path: /api/readyz
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 2
+
+# Graceful shutdown: preStop sleep lets the load balancer drain before SIGTERM.
+terminationGracePeriodSeconds: 45
+preStopSleepSeconds: 10
+
+# Local volumes (only used when STORE_ADAPTER=file or MEDIA_ADAPTER=file, e.g. kind).
+localData:
+  enabled: false
+  # emptyDir for kind; real clusters should use postgres and s3.
+  sizeLimit: 1Gi
+  stateDir: /data/state
+  mediaDir: /data/media
+
+networkPolicy:
+  enabled: true
+  ingressFrom:
+    # Namespace label of the ingress controller.
+    namespaceSelector:
+      kubernetes.io/metadata.name: traefik
+  # Egress allow-list (CIDRs or selectors). DNS is always allowed.
+  egress:
+    store:
+      cidrs: []        # e.g. the private subnet CIDR of Postgres
+      port: 5432
+    blob:
+      cidrs: []        # S3 / Blob / GCS endpoints or VPC endpoint CIDRs
+      port: 443
+    ai:
+      cidrs: []        # AI endpoint
+      port: 443
+    # Extra raw egress rules (NetworkPolicyEgressRule list)
+    extra: []
+
+cleanup:
+  enabled: true
+  schedule: "*/15 * * * *"
+  # Calls POST /api/internal/cleanup on the Service (route owned by W3, see feedback).
+  path: /api/internal/cleanup
+  activeDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3

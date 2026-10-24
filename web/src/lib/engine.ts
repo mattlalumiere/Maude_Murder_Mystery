@@ -1,4 +1,6 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { scryptSync, timingSafeEqual } from "node:crypto";
+import { LIMITS } from "./engine-limits";
+import { allocateJoinCode, getRuntime } from "./ids";
 import { fitPlan, recommend, TIERS } from "./budget";
 import { generateCase } from "./gm-ai";
 import { queueAvatars, queuePhaseMedia, reconcilePlan } from "./media-jobs";
@@ -10,37 +12,60 @@ import {
   type AgeGroup, type Ballot, type Character, type GameConfig, type MediaPlan, type Phase, type Player, type PlayerProfile, type Result, type Room,
 } from "./types";
 
-const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ";
 const DAY = 24 * 3600;
+/** A generation claim older than this is treated as abandoned (the request died), so the host can retry. */
+export const GENERATION_LOCK_MS = 90_000;
+/** The case must be ready by then or the built-in sample case is used, so a 60 s Lambda never times out. */
+export const GENERATION_DEADLINE_MS = 50_000;
+/** Deployments behind a 30 s proxy timeout (the CloudFront default) set GENERATION_DEADLINE_MS=25000. */
+export const generationDeadlineMs = () => Math.min(GENERATION_DEADLINE_MS, Math.max(5_000, Number(process.env.GENERATION_DEADLINE_MS) || GENERATION_DEADLINE_MS));
 
-const hashCode = (code: string, salt: string) => scryptSync(code.trim().toLowerCase(), salt, 32).toString("hex");
-const rid = (n = 12) => randomBytes(n).toString("base64url");
+const hashCode = (code: string, salt: string) => scryptSync(code.trim().toLowerCase().slice(0, LIMITS.overrideCodeMax), salt, 32).toString("hex");
+const safeEqual = (a: string, b: string) => {
+  const x = Buffer.from(a), y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+};
+const now = () => getRuntime().clock.now();
+const rid = (n = 12) => Buffer.from(getRuntime().random.bytes(n)).toString("base64url");
 const shuffle = <T,>(a: T[]) => {
   const r = [...a];
-  for (let i = r.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [r[i], r[j]] = [r[j], r[i]]; }
+  const rnd = getRuntime().random;
+  for (let i = r.length - 1; i > 0; i--) { const j = rnd.int(i + 1); [r[i], r[j]] = [r[j], r[i]]; }
   return r;
 };
 
 // ---------- creation / joining ----------
+export interface CreateRoomOptions {
+  /** Directory lookup (code to gameId). Return true if the join code is already taken. */
+  codeExists?: (code: string) => Promise<boolean>;
+}
+
 export async function createRoom(
   hostId: string, overrideCode: string, configIn?: Partial<GameConfig>, capIn?: number, planIn?: Partial<MediaPlan>,
+  opts: CreateRoomOptions = {},
 ): Promise<Room> {
-  if (overrideCode.trim().length < 4) throw new HttpError(400, "Override code must be at least 4 characters");
+  const trimmed = String(overrideCode ?? "").trim();
+  if (trimmed.length < LIMITS.overrideCodeMin) throw new HttpError(400, `Override code must be at least ${LIMITS.overrideCodeMin} characters`);
+  if (trimmed.length > LIMITS.overrideCodeMax) throw new HttpError(400, `Override code must be at most ${LIMITS.overrideCodeMax} characters`);
   const config = sanitizeConfig(configIn);
   const cap = money(capIn);
   const expected = config.expected.adults + config.expected.kids + config.expected.toddlers;
   const plan = fitPlan(sanitizePlan(planIn ?? (recommend(cap, expected).best ?? TIERS[0]).plan), cap, expected);
   const store = getStore();
-  for (let i = 0; i < 20; i++) {
-    const code = Array.from({ length: 4 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
+  const { random, ids } = getRuntime();
+  const exists = opts.codeExists ?? (async (c: string) => (await store.get(c)) !== null);
+  for (let i = 0; i < 5; i++) {
+    let code: string;
+    try { code = await allocateJoinCode(random, exists); } catch { throw new HttpError(500, "Could not allocate a room code"); }
     const salt = rid(8);
-    const now = Math.floor(Date.now() / 1000);
+    const nowS = Math.floor(now() / 1000);
     const room: Room = {
-      code, version: 1, createdAt: now, ttl: now + DAY, hostId, config, media: [],
+      code, gameId: ids.gameId(), cellId: process.env.CELL_ID || "local-0", regionId: process.env.REGION_ID || "local",
+      version: 1, createdAt: nowS, ttl: nowS + DAY, hostId, config, media: [],
       budget: { capUsd: cap, spentUsd: 0, reservedUsd: 0, plan },
       overrideSalt: salt, overrideHash: hashCode(overrideCode, salt),
       failedOverrides: 0, lockedUntil: 0, overrideUsed: false,
-      phase: "lobby", phaseStartedAt: Date.now(), paused: false,
+      phase: "lobby", phaseStartedAt: now(), paused: false,
       players: [], releasedClueIds: [], ballotsOpen: false,
     };
     if (await store.put(room, null)) return room;
@@ -50,10 +75,11 @@ export async function createRoom(
 
 export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>): Player {
   if (room.phase !== "lobby") throw new HttpError(409, "The game has already started");
-  const clean = name.trim().slice(0, 24);
+  if (room.generating && now() - room.generating < GENERATION_LOCK_MS) throw new HttpError(409, "The host is starting the game. Please wait a moment.");
+  const clean = String(name ?? "").trim().slice(0, LIMITS.playerName);
   if (!clean) throw new HttpError(400, "Name required");
   if (!["little", "kid", "teen", "adult"].includes(ageGroup)) throw new HttpError(400, "Bad age group");
-  if (room.players.length >= 40) throw new HttpError(409, "Room is full");
+  if (room.players.length >= LIMITS.maxPlayers) throw new HttpError(409, "Room is full");
   if (room.players.some((p) => p.name.toLowerCase() === clean.toLowerCase())) throw new HttpError(409, "That name is taken");
   const p: Player = {
     id: rid(6), name: clean, ageGroup, wantsVictim, token: rid(18), ready: false, hasDevice,
@@ -142,8 +168,8 @@ function castPlayers(room: Room) {
 
 export async function startGame(room: Room) {
   if (room.phase !== "lobby") throw new HttpError(409, "Already started");
-  if (room.players.length < 4) throw new HttpError(400, "Need at least 4 players");
-  if (room.players.filter((p) => p.ageGroup === "adult").length < 2) throw new HttpError(400, "Need at least 2 adults");
+  if (room.players.length < LIMITS.minPlayers) throw new HttpError(400, `Need at least ${LIMITS.minPlayers} players`);
+  if (room.players.filter((p) => p.ageGroup === "adult").length < LIMITS.minAdults) throw new HttpError(400, `Need at least ${LIMITS.minAdults} adults`);
   const adults = room.players.filter((p) => p.ageGroup === "adult").length;
   const gen = await generateCase(
     {
@@ -159,12 +185,43 @@ export async function startGame(room: Room) {
   setPhase(room, "cards");
 }
 
+/** Fast first half of Start: validates and claims the room. The slow AI call happens in /generate, outside this write. */
+export function beginGeneration(room: Room) {
+  if (room.phase !== "lobby") throw new HttpError(409, "Already started");
+  if (room.players.length < LIMITS.minPlayers) throw new HttpError(400, `Need at least ${LIMITS.minPlayers} players`);
+  if (room.players.filter((p) => p.ageGroup === "adult").length < LIMITS.minAdults) throw new HttpError(400, `Need at least ${LIMITS.minAdults} adults`);
+  if (room.generating && now() - room.generating < GENERATION_LOCK_MS) throw new HttpError(409, "Your mystery is already being written");
+  room.generating = now();
+}
+
+export function generationRoster(room: Room) {
+  const adults = room.players.filter((p) => p.ageGroup === "adult").length;
+  return {
+    adults, kids: room.players.length - adults, littles: room.players.filter((p) => p.ageGroup === "little").length,
+    players: room.players.map((p, i) => ({ handle: `P${i + 1}`, ageGroup: p.ageGroup, mode: p.profile.backstoryMode, text: p.profile.backstory })),
+  };
+}
+
+/** Second half of Start: applies a finished case. Safe to call only once; later calls are ignored. */
+export function finishGeneration(room: Room, gen: Awaited<ReturnType<typeof generateCase>>) {
+  if (room.phase !== "lobby" || !room.generating) return false;
+  room.case = gen.case;
+  room.caseSource = gen.source;
+  castPlayers(room);
+  queueAvatars(room);
+  room.generating = undefined;
+  setPhase(room, "cards");
+  return true;
+}
+
 // ---------- phases ----------
 function setPhase(room: Room, phase: Phase) {
   room.phase = phase;
-  room.phaseStartedAt = Date.now();
+  room.phaseStartedAt = now();
   const k = room.case!;
-  const release = (ids: string[]) => ids.forEach((id) => !room.releasedClueIds.includes(id) && room.releasedClueIds.push(id));
+  const release = (ids: string[]) => ids.forEach((id) => {
+    if (!room.releasedClueIds.includes(id) && room.releasedClueIds.length < LIMITS.maxCluesReleased) room.releasedClueIds.push(id);
+  });
   if (phase === "act2") release(k.clues.filter((c) => c.round === 1).map((c) => c.id));
   if (phase === "act3") release([...k.clues.filter((c) => c.round === 2).map((c) => c.id), "twist"]);
   room.ballotsOpen = phase === "act4";
@@ -229,16 +286,16 @@ function computeResult(room: Room): Result {
 export type OverrideCmd = "NUDGE" | "ADVANCED" | "ACCELERATE" | "FINAL" | "FINAL_REVEAL";
 
 export function override(room: Room, code: string, cmd: OverrideCmd, confirm: boolean): { message: string; needsConfirm?: boolean } {
+  if (now() < room.lockedUntil) throw new HttpError(429, "Security guard Gerald is guarding the vault. Try again later.");
   if (!room.case) throw new HttpError(409, "No case yet");
-  if (Date.now() < room.lockedUntil) throw new HttpError(429, "Security guard Gerald is guarding the vault. Try again later.");
-  const a = Buffer.from(hashCode(code ?? "", room.overrideSalt));
+  const a = Buffer.from(hashCode(typeof code === "string" ? code : "", room.overrideSalt));
   const b = Buffer.from(room.overrideHash);
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
     room.failedOverrides += 1;
-    if (room.failedOverrides >= 3) {
+    if (room.failedOverrides >= LIMITS.overrideMaxFailures) {
       room.failedOverrides = 0;
-      room.lockedUntil = Date.now() + 10 * 60 * 1000;
-      throw new HttpError(429, "Alarm! Security guard Gerald approaches. Overrides locked for 10 minutes.");
+      room.lockedUntil = now() + LIMITS.overrideLockMs;
+      throw new HttpError(429, `Alarm! Security guard Gerald approaches. Overrides locked for ${Math.round(LIMITS.overrideLockMs / 60000)} minutes.`);
     }
     throw new HttpError(403, "The vault door does not budge.");
   }
@@ -294,6 +351,8 @@ export function publicView(room: Room) {
     media: room.media.filter((m) => m.status === "done").map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, caption: m.caption, mime: m.mime })),
     narration: k?.narration[room.phase],
     lobbyNames: room.players.map((p) => p.name),
+    starting: !!room.generating,
+    drinking: room.config.drinking,
     roster, clues,
     ballotsOpen: room.ballotsOpen,
     ballotOptions: room.ballotsOpen && k
@@ -331,6 +390,7 @@ export function hostView(room: Room) {
     overrideUsed: room.overrideUsed,
     lockedUntil: room.lockedUntil,
     config: room.config,
+    generating: room.generating ?? null,
     caseSource: room.caseSource,
     budget: room.budget,
     jobs: room.media.slice(-60).map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, status: m.status, note: m.note, est: m.estCostUsd, caption: m.caption })),
@@ -345,7 +405,7 @@ export function hostView(room: Room) {
 
 export function authPlayer(room: Room, id: string | null, token: string | null): Player {
   const p = room.players.find((x) => x.id === id);
-  if (!p || !token || p.token !== token) throw new HttpError(401, "Unknown player");
+  if (!p || !token || !safeEqual(p.token, token)) throw new HttpError(401, "Unknown player");
   return p;
 }
 
@@ -376,4 +436,25 @@ export async function removePhoto(room: Room, p: Player) {
 export async function purgePhotos(room: Room) {
   await getMediaStore().deletePrefix(`${room.code}/photos`);
   for (const p of room.players) { p.profile.photoKey = undefined; p.profile.consent = "none"; }
+}
+
+/** Removes a player and deletes their uploaded photo so it cannot outlive their place in the game. */
+export async function kickPlayer(room: Room, playerId: string) {
+  const p = room.players.find((x) => x.id === playerId);
+  if (!p) return;
+  if (p.profile.photoKey) await getMediaStore().deletePrefix(p.profile.photoKey);
+  room.players = room.players.filter((x) => x.id !== playerId);
+}
+
+const MEDIA_ACTIVE = new Set(["queued", "running", "polling"]);
+
+/**
+ * True when no media job still needs player photos as references: nothing is queued or running, and either the
+ * reveal is reached or no later scene/video will use them. Avatar-only plans purge as soon as the portraits are done.
+ */
+export function photosCanBePurged(room: Room) {
+  if (room.phase === "lobby" || !room.players.some((p) => p.profile.photoKey)) return false;
+  if (room.media.some((m) => MEDIA_ACTIVE.has(m.status))) return false;
+  const laterArt = room.budget.plan.scenesPerAct > 0 || room.budget.plan.videoClips > 0;
+  return room.phase === "reveal" || !laterArt;
 }

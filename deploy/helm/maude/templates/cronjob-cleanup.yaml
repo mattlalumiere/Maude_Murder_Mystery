@@ -1,0 +1,62 @@
+{{- if .Values.cleanup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "maude.fullname" . }}-cleanup
+  labels:
+    {{- include "maude.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cleanup
+spec:
+  schedule: {{ .Values.cleanup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.cleanup.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cleanup.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: {{ .Values.cleanup.activeDeadlineSeconds }}
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "maude.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: cleanup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: cleanup
+              image: {{ include "maude.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              env:
+                - name: CLEANUP_URL
+                  value: "http://{{ include "maude.fullname" . }}:{{ .Values.service.port }}{{ .Values.cleanup.path }}"
+                - name: CLEANUP_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.secrets.secretName }}
+                      key: CLEANUP_TOKEN
+                      optional: true
+              command:
+                - node
+                - -e
+                - |
+                  fetch(process.env.CLEANUP_URL, {method: "POST", headers: {authorization: "Bearer " + (process.env.CLEANUP_TOKEN || "")}, signal: AbortSignal.timeout(120000)})
+                    .then(async (r) => { console.log(r.status, await r.text()); process.exit(r.ok ? 0 : 1); })
+                    .catch((e) => { console.error(String(e)); process.exit(1); });
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 96Mi
+                limits:
+                  memory: 192Mi
+{{- end }}

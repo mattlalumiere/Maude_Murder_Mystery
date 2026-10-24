@@ -1,0 +1,133 @@
+# Local stack for Colima + Docker. Lean on purpose: the host runs a ~17GB local model.
+# Default: just `web` (file store, file blobs). Optional profiles: s3, pg, loadtest.
+# Use scripts/up.sh (make up) so AUTH_SECRET exists and profile env is wired.
+name: maude
+
+services:
+  web:
+    image: maude-web:local
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      STORE_ADAPTER: ${STORE_ADAPTER:-file}
+      STORE_FILE_DIR: /data/state
+      DATABASE_URL: ${DATABASE_URL:-}
+      MEDIA_ADAPTER: ${MEDIA_ADAPTER:-file}
+      MEDIA_FILE_DIR: /data/media
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-}
+      AI_TEXT_ADAPTER: ${AI_TEXT_ADAPTER:-openai-compatible}
+      AI_BASE_URL: ${AI_BASE_URL:-http://host.docker.internal:8080/v1}
+      AI_MODEL: ${AI_MODEL:-mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-60000}
+      CELL_ID: ${CELL_ID:-local-0}
+      REGION_ID: ${REGION_ID:-local}
+      ALLOW_DEV_LOGIN: ${ALLOW_DEV_LOGIN:-true}
+      AUTH_TRUST_HOST: "true"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    pids_limit: 256
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+
+  # ---- profile s3: RustFS as an S3 API target (MinIO no longer publishes images).
+  # Set MEDIA_ADAPTER=s3 and the S3_* env via `make up PROFILE=s3`.
+  objectstore:
+    profiles: [s3]
+    image: rustfs/rustfs:1.0.3
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY:-minio-local}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY:-minio-local-secret}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - objects:/data
+    mem_limit: 384m
+
+  # Creates the bucket with a SigV4 signed PUT (tiny curl image, retries until the store is up).
+  bucket-init:
+    profiles: [s3]
+    image: curlimages/curl:8.11.1
+    depends_on:
+      - objectstore
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minio-local}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minio-local-secret}
+      S3_BUCKET: ${S3_BUCKET:-maude-media}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        curl -sS --retry 30 --retry-delay 2 --retry-connrefused --retry-all-errors
+        -o /dev/null -w "bucket %{http_code}\n" -X PUT
+        --aws-sigv4 "aws:amz:us-east-1:s3" --user "$$S3_ACCESS_KEY:$$S3_SECRET_KEY"
+        "http://objectstore:9000/$$S3_BUCKET"
+    restart: "no"
+    mem_limit: 64m
+
+  # ---- profile pg: Postgres 17 (set STORE_ADAPTER=postgres via `make up PROFILE=pg`) ----
+  postgres:
+    profiles: [pg]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: maude
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-maude-local}
+      POSTGRES_DB: maude
+    command: ["postgres", "-c", "shared_buffers=32MB", "-c", "max_connections=40", "-c", "fsync=off"]
+    ports:
+      - "127.0.0.1:5432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data:size=256m
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maude -d maude"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ---- profile loadtest: k6 against web, scripts from deploy/load ----
+  k6:
+    profiles: [loadtest]
+    image: grafana/k6:0.57.0
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://web:3000
+      K6_SCRIPT: ${K6_SCRIPT:-smoke.js}
+    volumes:
+      - ../load:/scripts:ro
+    entrypoint: ["/bin/sh", "-c", "k6 run /scripts/$$K6_SCRIPT"]
+    restart: "no"
+    mem_limit: 256m
+
+volumes:
+  data:
+  objects:

@@ -1,6 +1,7 @@
+import { LIMITS } from "./engine-limits";
 import type { GameConfig, MediaPlan, PlayerProfile, Spice } from "./types";
 
-const clean = (v: unknown, max: number) =>
+export const clean = (v: unknown, max: number) =>
   String(v ?? "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").trim().slice(0, max);
 const int = (v: unknown, lo: number, hi: number, d: number) => {
   const n = Math.round(Number(v));
@@ -12,20 +13,20 @@ export function sanitizeConfig(i: Partial<GameConfig> | undefined): GameConfig {
   const spice: Spice = (["mild", "medium", "spicy"] as const).includes(x.spice as Spice) ? (x.spice as Spice) : "medium";
   const len = [90, 120, 150].includes(Number(x.lengthMin)) ? (Number(x.lengthMin) as GameConfig["lengthMin"]) : 120;
   return {
-    name: clean(x.name, 60),
+    name: clean(x.name, LIMITS.configName),
     expected: {
-      adults: int(x.expected?.adults, 2, 40, 12),
-      kids: int(x.expected?.kids, 0, 30, 6),
-      toddlers: int(x.expected?.toddlers, 0, 10, 1),
+      adults: int(x.expected?.adults, 2, LIMITS.expectedAdultsMax, 12),
+      kids: int(x.expected?.kids, 0, LIMITS.expectedKidsMax, 6),
+      toddlers: int(x.expected?.toddlers, 0, LIMITS.expectedToddlersMax, 1),
     },
     lengthMin: len,
     spice,
     drinking: x.drinking === "none" ? "none" : "adults",
-    themePrompt: clean(x.themePrompt, 400),
-    settingPrompt: clean(x.settingPrompt, 400),
-    tonePrompt: clean(x.tonePrompt, 300),
-    mustInclude: clean(x.mustInclude, 400),
-    avoid: clean(x.avoid, 400),
+    themePrompt: clean(x.themePrompt, LIMITS.configPrompt),
+    settingPrompt: clean(x.settingPrompt, LIMITS.configPrompt),
+    tonePrompt: clean(x.tonePrompt, LIMITS.configTone),
+    mustInclude: clean(x.mustInclude, LIMITS.configPrompt),
+    avoid: clean(x.avoid, LIMITS.configPrompt),
     allowPlayerBackstory: x.allowPlayerBackstory !== false,
   };
 }
@@ -45,7 +46,7 @@ export function sanitizePlan(i: Partial<MediaPlan> | undefined, prev?: MediaPlan
 export function sanitizeProfile(i: Partial<PlayerProfile> | undefined, allowBackstory: boolean): PlayerProfile {
   const x = i ?? {};
   const mode = allowBackstory && (x.backstoryMode === "hint" || x.backstoryMode === "own") ? x.backstoryMode : "gm";
-  const backstory = mode === "gm" ? "" : clean(x.backstory, 600);
+  const backstory = mode === "gm" ? "" : clean(x.backstory, LIMITS.backstory);
   return {
     backstoryMode: backstory ? mode : "gm",
     backstory,

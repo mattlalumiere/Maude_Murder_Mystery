@@ -18,7 +18,7 @@ A guide for the host and the players. Plan on about 2 hours, 15 to 30 people, ag
 4. Type your Host Override Code and create the room. You get a 4-letter **room code** and an **invite link** with a QR code.
 5. Open the **big screen** link on the TV.
 6. **Share the invite link with every player.** Each person builds their character: name, age group, and a backstory. They can choose "Surprise me", give the GM an idea (a hobby, a quirk), or write their own. Kids and teens who want to be the victim (and come back as the Ghost) tick the box.
-7. **Optional photo:** a player can add a photo so the AI can draw a cartoon look-alike of their character into the story. Adults consent for themselves; a parent or guardian consents for anyone under 18. Photos are never shown to other players and are deleted within 24 hours, or sooner with "Delete player photos" in the host console.
+7. **Optional photo (adults by default):** an adult can add a photo so the AI can draw a cartoon look-alike of their character into the story. **Photo likenesses for anyone under 18 are off by default.** The operator can turn them on (`ALLOW_MINOR_PHOTOS=true`) only with a real parent or guardian consent process for each child. Photos are never shown to other players, metadata is stripped on upload, and photos are meant to be deleted within 24 hours (or sooner with "Delete player photos" in the host console). Share the plain-language notice at `/privacy` with parents. Kids who skip the photo still get a cartoon character.
 8. For toddlers or anyone without a phone, use **Add player** in the host console and hand the link to their grown-up.
 9. When everyone is in, press **Cast the characters and start**. The AI picks the killer in secret.
 

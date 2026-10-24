@@ -1,0 +1,88 @@
+# Runbook: deploy and run a party on AWS (SST)
+
+**Status: written, never run against real AWS.** Do the dry run in step 4 before party day. The portable multi-cloud platform in `docs/platform/` is a separate, longer-term direction; this is the first-iteration path (Lambda, DynamoDB, S3, Bedrock).
+
+Why these env vars work: the app still maps `ROOMS_TABLE` to the DynamoDB store, `MEDIA_BUCKET` to the S3 store, and `BEDROCK_MODEL_ID` to Bedrock text. Those adapters are marked legacy in the code (kept working, not extended).
+
+## 0. Before you start
+
+- An AWS account, region **us-east-1**, and the AWS CLI configured. Check: `aws sts get-caller-identity`.
+- Node 22. From `web/`: `npm ci`.
+- **Bedrock model access** (AWS console, Bedrock, Model access): enable a text model you will use, **Amazon Nova Canvas**, and **Amazon Nova Reel**. Some newer models need an inference profile ID (for example one starting with `us.`) as `BEDROCK_MODEL_ID`.
+- **A budget alarm:** AWS Billing, Budgets, create a monthly cost budget of about $10 with an email alert. The app's own spend cap only covers pictures and video, not text or moderation.
+- **Raise the CloudFront origin response timeout** from 30 s to 60 s (Service Quotas) if you want AI-written mysteries. Otherwise leave `GENERATION_DEADLINE_MS=25000` (the default in `sst.config.ts`); the game then falls back to the built-in sample case whenever the AI takes longer than 25 s.
+
+## 1. Configure (in the shell you deploy from)
+
+```bash
+export AUTH_SECRET="$(npx auth secret --raw 2>/dev/null || openssl rand -base64 32)"
+export BEDROCK_MODEL_ID="<your text model or inference profile id>"
+export MEDIA_PROVIDER=bedrock          # use "mock" to test without paying for images
+export ALLOW_MINOR_PHOTOS=false        # keep false unless you have a real guardian-consent process
+```
+
+These values become Lambda environment variables, so anyone with access to the AWS account can read them. That is acceptable for a private family event; move them to SST secrets before wider use.
+
+## 2. First deploy
+
+```bash
+cd web
+npx sst deploy --stage party
+```
+
+Note the site URL it prints (a `cloudfront.net` address). Open `<url>/api/healthz` and expect a healthy response.
+
+## 3. Turn on host sign-in
+
+Dev login is disabled in production, so hosts need a real provider. Google is the quickest:
+
+1. Google Cloud Console, APIs and Services, Credentials, **Create OAuth client ID** (Web application).
+2. Authorized redirect URI: `https://<your-cloudfront-url>/api/auth/callback/google`.
+3. Export the values and redeploy:
+
+```bash
+export AUTH_GOOGLE_ID="..." AUTH_GOOGLE_SECRET="..."
+npx sst deploy --stage party
+```
+
+Apple needs a paid Apple Developer account. Facebook needs app review for production. Skip both for the first party.
+
+## 4. Dry run (required; about 30 minutes; cap it at $3)
+
+1. Open the site on a laptop, sign in, and create a game with a **$3** budget.
+2. Open the big screen on a second tab. Join with two phones (one adult, one kid).
+3. Add an adult photo. Confirm it is accepted. Confirm the kid cannot add one (expected).
+4. Press **Start**. You should see "writing your mystery" for up to about a minute. Note whether the case came from Bedrock or the sample (the host console shows the source).
+5. Play through to the reveal on the phones, using Next. Check that portraits and scenes appear and that the spend meter stays under $3.
+6. After the reveal, confirm the uploaded photo is gone: S3 console, your Media bucket, look under the game's `photos/` folder.
+7. Look in CloudWatch Logs for errors (Lambda log group for the web function).
+8. Next day, check Cost Explorer (it lags about 24 hours) against the $3 expectation.
+
+Fix anything that failed before inviting guests.
+
+## 5. Party-day checklist
+
+- [ ] Deploy at least a day ahead; re-run `/api/healthz`.
+- [ ] Budget alarm still active in AWS Budgets.
+- [ ] Sign in as host; create the game; print or open [HOST_CARD.md](HOST_CARD.md).
+- [ ] Big screen open on the TV; invite link and QR tested from one phone.
+- [ ] Keep the **host tab open and awake** (it drives the picture worker). The game still plays without art if it sleeps.
+- [ ] Fallback ready: set pictures to **Pause AI media**, or choose "Text only". The sample case works with no AI.
+
+## 6. During and after
+
+- If something loops or costs look wrong: in the host console choose **Pause AI media** and set the budget to what is already spent.
+- After the party: use **Delete player photos** in the host console, then tear down if you do not need it (below).
+
+## 7. Rollback and teardown
+
+- **Roll back a bad deploy:** `git checkout <last-good-commit>`, then `cd web && npx sst deploy --stage party`.
+- **Tear everything down:** `cd web && npx sst remove --stage party`. For non-production stages this deletes the table and bucket and all data in them. Note that the production stage retains them.
+
+## 8. Cost expectations (estimates only)
+
+About $2 to $5 for a 16 to 30 player party with portraits, scenes, and a few clips (see `web/src/lib/budget.ts` for the constants), plus well under $0.50 for Lambda, DynamoDB, and S3. Always confirm in Cost Explorer.
+
+## 9. Known risks
+
+See [docs/council/2026-10-23-launch-readiness.md](council/2026-10-23-launch-readiness.md). Still open: the AWS path has never run for real, optimistic-lock "Busy" errors can appear when many phones tap at once, a sleeping host tab pauses pictures, and unit and BDD suites under `web/test` have not been run.

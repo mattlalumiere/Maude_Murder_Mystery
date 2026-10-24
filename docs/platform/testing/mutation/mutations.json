@@ -1,0 +1,1266 @@
+[
+ {
+  "id": "E01",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "advance allows moving past the last phase",
+  "find": "if (i >= PHASES.length - 1) throw",
+  "replace": "if (i >= PHASES.length) throw"
+ },
+ {
+  "id": "E02",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "ballots open in act3 instead of act4",
+  "find": "room.ballotsOpen = phase === \"act4\"",
+  "replace": "room.ballotsOpen = phase === \"act3\""
+ },
+ {
+  "id": "E03",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "act2 releases round 2 clues",
+  "find": "if (phase === \"act2\") release(k.clues.filter((c) => c.round === 1)",
+  "replace": "if (phase === \"act2\") release(k.clues.filter((c) => c.round === 2)"
+ },
+ {
+  "id": "E04",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "killer vote worth 2 points not 3",
+  "find": "{ pts += 3;",
+  "replace": "{ pts += 2;"
+ },
+ {
+  "id": "E05",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "got-away bonus 4 not 5",
+  "find": "{ pts += 5;",
+  "replace": "{ pts += 4;"
+ },
+ {
+  "id": "E06",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "got-away threshold uses <= (a tie counts as got away)",
+  "find": "correct < voters.length / 2",
+  "replace": "correct <= voters.length / 2"
+ },
+ {
+  "id": "E07",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "override lockout needs one failure too many",
+  "find": "room.failedOverrides >= LIMITS.overrideMaxFailures",
+  "replace": "room.failedOverrides > LIMITS.overrideMaxFailures"
+ },
+ {
+  "id": "E08",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "lockout duration is zero",
+  "find": "room.lockedUntil = now() + LIMITS.overrideLockMs",
+  "replace": "room.lockedUntil = now()"
+ },
+ {
+  "id": "E09",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "locked check inverted (never locked)",
+  "find": "if (now() < room.lockedUntil) throw",
+  "replace": "if (now() > room.lockedUntil + 1e12) throw"
+ },
+ {
+  "id": "E10",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "failed override counter not reset on success",
+  "find": "  room.failedOverrides = 0;\n  const k = room.case;",
+  "replace": "  const k = room.case;"
+ },
+ {
+  "id": "E11",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "FINAL skips the confirm step",
+  "find": "if (!confirm) return { needsConfirm: true",
+  "replace": "if (confirm) return { needsConfirm: true"
+ },
+ {
+  "id": "E12",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "ACCELERATE no longer unpauses",
+  "find": "room.paused = false;\n      advance(room);",
+  "replace": "advance(room);"
+ },
+ {
+  "id": "E13",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "override code no longer case-insensitive",
+  "find": "scryptSync(code.trim().toLowerCase().slice(",
+  "replace": "scryptSync(code.trim().slice("
+ },
+ {
+  "id": "E14",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "victim prefers kid over volunteer",
+  "find": "young.find((p) => p.wantsVictim) ?? young.find((p) => p.ageGroup === \"kid\")",
+  "replace": "young.find((p) => p.ageGroup === \"kid\") ?? young.find((p) => p.wantsVictim)"
+ },
+ {
+  "id": "E15",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "room full check off by one",
+  "find": "room.players.length >= LIMITS.maxPlayers",
+  "replace": "room.players.length > LIMITS.maxPlayers"
+ },
+ {
+  "id": "E16",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "name uniqueness becomes case sensitive",
+  "find": "p.name.toLowerCase() === clean.toLowerCase()",
+  "replace": "p.name === clean"
+ },
+ {
+  "id": "E17",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "players can join after start",
+  "find": "if (room.phase !== \"lobby\") throw new HttpError(409, \"The game has already started\")",
+  "replace": "if (false) throw new HttpError(409, \"The game has already started\")"
+ },
+ {
+  "id": "E18",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "min adults check off by one",
+  "find": "filter((p) => p.ageGroup === \"adult\").length < LIMITS.minAdults",
+  "replace": "filter((p) => p.ageGroup === \"adult\").length <= LIMITS.minAdults"
+ },
+ {
+  "id": "E19",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "ballots accepted when closed",
+  "find": "if (!room.ballotsOpen) throw",
+  "replace": "if (false) throw"
+ },
+ {
+  "id": "E20",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "kids can be suspects on the ballot",
+  "find": "c.id !== room.case!.victimId && !c.kid)",
+  "replace": "c.id !== room.case!.victimId)"
+ },
+ {
+  "id": "E21",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "advance works while paused",
+  "find": "if (room.paused) throw new HttpError(409, \"Game is paused\")",
+  "replace": "if (false) throw new HttpError(409, \"Game is paused\")"
+ },
+ {
+  "id": "E22",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "LEAK: killerId in publicView",
+  "find": "code: room.code, version: room.version, phase: room.phase,",
+  "replace": "code: room.code, killerId: room.case?.killerId, version: room.version, phase: room.phase,"
+ },
+ {
+  "id": "E23",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "LEAK: override hash in hostView",
+  "find": "    overrideUsed: room.overrideUsed,",
+  "replace": "    overrideUsed: room.overrideUsed, overrideHash: room.overrideHash,"
+ },
+ {
+  "id": "E24",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "LEAK: other players cards in public roster",
+  "find": "tease: c?.tease ?? \"\", kid: c?.kid ?? false,",
+  "replace": "tease: c?.tease ?? \"\", card: c?.card, kid: c?.kid ?? false,"
+ },
+ {
+  "id": "E25",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "LEAK: unreleased clues shown",
+  "find": "filter((c) => room.releasedClueIds.includes(c.id)).map",
+  "replace": "filter(() => true).map"
+ },
+ {
+  "id": "E26",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "LEAK: photoKey in playerView",
+  "find": "consent: p.profile.consent, hasPhoto: !!p.profile.photoKey }",
+  "replace": "consent: p.profile.consent, photoKey: p.profile.photoKey, hasPhoto: !!p.profile.photoKey }"
+ },
+ {
+  "id": "E27",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "authPlayer: length mismatch throws instead of 401",
+  "find": "return x.length === y.length && timingSafeEqual(x, y);",
+  "replace": "return timingSafeEqual(x, y);"
+ },
+ {
+  "id": "E28",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "min override code length off by one",
+  "find": "trimmed.length < LIMITS.overrideCodeMin",
+  "replace": "trimmed.length <= LIMITS.overrideCodeMin"
+ },
+ {
+  "id": "E29",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "budget cap may drop below spend",
+  "find": "cap < b.spentUsd + b.reservedUsd",
+  "replace": "cap > b.spentUsd + b.reservedUsd"
+ },
+ {
+  "id": "E30",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "minors may consent for themselves",
+  "find": "consent !== \"guardian\") throw",
+  "replace": "consent !== \"self\") throw"
+ },
+ {
+  "id": "E31",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "removePhoto leaves the blob behind",
+  "find": "if (p.profile.photoKey) await getMediaStore().deletePrefix(p.profile.photoKey);",
+  "replace": ""
+ },
+ {
+  "id": "E32",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "game ttl is zero",
+  "find": "ttl: nowS + DAY",
+  "replace": "ttl: nowS"
+ },
+ {
+  "id": "E33",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "reveal phase does not compute result",
+  "find": "if (phase === \"reveal\") room.result = computeResult(room);",
+  "replace": ""
+ },
+ {
+  "id": "E34",
+  "area": "engine",
+  "file": "web/src/lib/engine.ts",
+  "desc": "FINAL_REVEAL does not unpause",
+  "find": "room.paused = false;\n        setPhase(room, \"reveal\");",
+  "replace": "setPhase(room, \"reveal\");"
+ },
+ {
+  "id": "C01",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "min clues 8 becomes 7",
+  "find": "if (c.clues.length < 8) err",
+  "replace": "if (c.clues.length < 7) err"
+ },
+ {
+  "id": "C02",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "kid killer accepted",
+  "find": "if (k.kid === true) err(\"killerId\"",
+  "replace": "if (false) err(\"killerId\""
+ },
+ {
+  "id": "C03",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "victim may equal killer",
+  "find": "else if (c.victimId === c.killerId)",
+  "replace": "else if (c.victimId !== c.killerId)"
+ },
+ {
+  "id": "C04",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "truth.story pasted in public text not detected",
+  "find": "if (secretStory && v.includes(secretStory))",
+  "replace": "if (false && secretStory && v.includes(secretStory))"
+ },
+ {
+  "id": "C05",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "id pattern allows 400 chars",
+  "find": "const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;",
+  "replace": "const ID_RE = /^[A-Za-z0-9_-]{1,400}$/;"
+ },
+ {
+  "id": "C06",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "reserved clue id twist accepted",
+  "find": "else if (cl.id === \"twist\") err",
+  "replace": "else if (false) err"
+ },
+ {
+  "id": "C07",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "repair lets a clue take the id twist",
+  "find": "const used = new Set<string>([\"twist\"]);",
+  "replace": "const used = new Set<string>();"
+ },
+ {
+  "id": "C08",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "character need cap 6 becomes 60",
+  "find": "+ (Number(roster.kids) || 0), 6)",
+  "replace": "+ (Number(roster.kids) || 0), 60)"
+ },
+ {
+  "id": "C09",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "killer secret leak check dropped",
+  "find": "if (killerSecret && v.includes(killerSecret))",
+  "replace": "if (false && killerSecret && v.includes(killerSecret))"
+ },
+ {
+  "id": "C10",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "round 2 clue presence not required",
+  "find": "if (c.clues.length >= 8 && !rounds.has(2)) err",
+  "replace": "if (false && !rounds.has(2)) err"
+ },
+ {
+  "id": "C11",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "truth.methodId not checked against methods",
+  "find": "if (!nonEmpty(t.methodId) || !methodIds.has(t.methodId)) err",
+  "replace": "if (false) err"
+ },
+ {
+  "id": "C12",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "extract JSON from first closing brace",
+  "find": "const a = s.indexOf(\"{\"), b = s.lastIndexOf(\"}\");",
+  "replace": "const a = s.indexOf(\"{\"), b = s.indexOf(\"}\");"
+ },
+ {
+  "id": "C13",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "total size limit ignored",
+  "find": "if (total > LIMITS.caseTotalChars) err",
+  "replace": "if (false) err"
+ },
+ {
+  "id": "C14",
+  "area": "case-validate",
+  "file": "web/src/lib/case-validate.ts",
+  "desc": "options minimum 2 becomes 1",
+  "find": "if (list.length < 2) err(key",
+  "replace": "if (list.length < 1) err(key"
+ },
+ {
+  "id": "S01",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "path traversal '..' allowed in segment",
+  "find": ".test(s) || s.includes(\"..\")",
+  "replace": ".test(s) || false"
+ },
+ {
+  "id": "S02",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "name depth limit removed",
+  "find": "if (segs.length > MAX_DEPTH)",
+  "replace": "if (segs.length > 99)"
+ },
+ {
+  "id": "S03",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "reserved .mime suffix allowed",
+  "find": "if (RESERVED_SUFFIXES.some((x) => last.endsWith(x)))",
+  "replace": "if (false)"
+ },
+ {
+  "id": "S04",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "assertKeyInGame ignores gameId",
+  "find": "if (p.cell !== cell || p.gameId !== gameId) throw",
+  "replace": "if (p.cell !== cell) throw"
+ },
+ {
+  "id": "S05",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "game id may be 1 char",
+  "find": "const GAME_RE = /^[A-Za-z0-9]{4,32}$/;",
+  "replace": "const GAME_RE = /^[A-Za-z0-9]{1,32}$/;"
+ },
+ {
+  "id": "S06",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "prefix from another cell accepted",
+  "find": "if (c !== cell) throw new KeyError(\"prefix belongs to another cell\");",
+  "replace": ""
+ },
+ {
+  "id": "S07",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "blob key of another cell accepted",
+  "find": "if (p.cell !== cell) throw new KeyError(\"key belongs to another cell\");",
+  "replace": ""
+ },
+ {
+  "id": "S08",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "leading dot allowed in segment (dotfiles)",
+  "find": "const SEG_RE = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$/;",
+  "replace": "const SEG_RE = /^[A-Za-z0-9_.-][A-Za-z0-9._-]{0,127}$/;"
+ },
+ {
+  "id": "S09",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "segments starting with - or _ rejected again (W5 base64url ids)",
+  "find": "const SEG_RE = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$/;",
+  "replace": "const SEG_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;"
+ },
+ {
+  "id": "S10",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "MAX_KEY length check removed in tenantKey",
+  "find": "if (key.length > MAX_KEY) throw new KeyError(\"key too long\");",
+  "replace": ""
+ },
+ {
+  "id": "S11",
+  "area": "storage",
+  "file": "web/src/lib/storage/keys.ts",
+  "desc": "parseKey accepts non canonical keys",
+  "find": "if (tenantKey(cell, gameId, kind, name) !== key) throw",
+  "replace": "if (false) throw"
+ },
+ {
+  "id": "S12",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "TTL ignored on read",
+  "find": "if (isExpired(r.ttl)) return null;",
+  "replace": ""
+ },
+ {
+  "id": "S13",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "optimistic version check removed",
+  "find": "if ((cur?.version ?? null) !== expected) return false;",
+  "replace": ""
+ },
+ {
+  "id": "S14",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "delete leaves blobs",
+  "find": "await this.o.media?.deletePrefix(`${this.o.cellId}/games/${gameId}`);",
+  "replace": ""
+ },
+ {
+  "id": "S15",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "delete leaves directory entry",
+  "find": "if (r && this.dir.get(r.code) === gameId) this.dir.delete(r.code);",
+  "replace": ""
+ },
+ {
+  "id": "S16",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "getById returns live reference not a clone",
+  "find": "return structuredClone(r);\n  }\n  async put",
+  "replace": "return r;\n  }\n  async put"
+ },
+ {
+  "id": "S17",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "put stores caller object (aliasing)",
+  "find": "this.games.set(gameId, structuredClone(room));",
+  "replace": "this.games.set(gameId, room);"
+ },
+ {
+  "id": "S18",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-memory.ts",
+  "desc": "listExpired lists the wrong cell silently",
+  "find": "if (cellId !== this.o.cellId) throw new KeyError(\"wrong cell\");",
+  "replace": ""
+ },
+ {
+  "id": "S19",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-common.ts",
+  "desc": "isExpired inverted",
+  "find": "ttlSeconds * 1000 < nowMs",
+  "replace": "ttlSeconds * 1000 > nowMs"
+ },
+ {
+  "id": "S20",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-common.ts",
+  "desc": "page limit cap 1000 raised",
+  "find": "Math.min(Math.floor(limit) || 1, 1000)",
+  "replace": "Math.min(Math.floor(limit) || 1, 100000)"
+ },
+ {
+  "id": "S21",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-common.ts",
+  "desc": "state size limit boundary (> becomes >=)",
+  "find": "Buffer.byteLength(json) > max",
+  "replace": "Buffer.byteLength(json) >= max"
+ },
+ {
+  "id": "S22",
+  "area": "storage",
+  "file": "web/src/lib/storage/quota.ts",
+  "desc": "quota decorator ignores replaced blob size",
+  "find": "replacedBytes: existing?.size ?? 0",
+  "replace": "replacedBytes: 0"
+ },
+ {
+  "id": "S23",
+  "area": "storage",
+  "file": "web/src/lib/storage/limits.ts",
+  "desc": "per-game quota ignores replaced bytes",
+  "find": "c.currentBytes - c.replacedBytes + c.addBytes > this.limits.maxGameBytes",
+  "replace": "c.currentBytes + c.addBytes > this.limits.maxGameBytes"
+ },
+ {
+  "id": "S24",
+  "area": "storage",
+  "file": "web/src/lib/storage/limits.ts",
+  "desc": "blob size limit boundary (> becomes >=)",
+  "find": "c.addBytes > this.limits.maxBlobBytes",
+  "replace": "c.addBytes >= this.limits.maxBlobBytes"
+ },
+ {
+  "id": "S25",
+  "area": "storage",
+  "file": "web/src/lib/storage/limits.ts",
+  "desc": "per-game quota boundary (> becomes >=)",
+  "find": "+ c.addBytes > this.limits.maxGameBytes",
+  "replace": "+ c.addBytes >= this.limits.maxGameBytes"
+ },
+ {
+  "id": "S26",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-file.ts",
+  "desc": "file store version check removed",
+  "find": "|| cur.version !== expected || cur.code !== code) return false;",
+  "replace": "|| cur.code !== code) return false;"
+ },
+ {
+  "id": "S27",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-file.ts",
+  "desc": "file store delete leaves blobs",
+  "find": "await this.o.media?.deletePrefix(`${this.o.cellId}/games/${gameId}`);",
+  "replace": ""
+ },
+ {
+  "id": "S28",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-file.ts",
+  "desc": "file store ignores TTL on read",
+  "find": "return r && !isExpired(r.ttl) ? r : null;",
+  "replace": "return r;"
+ },
+ {
+  "id": "S29",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-file.ts",
+  "desc": "file store create may overwrite live game",
+  "find": "if (cur && !isExpired(cur.ttl)) return false;",
+  "replace": ""
+ },
+ {
+  "id": "S30",
+  "area": "storage",
+  "file": "web/src/lib/storage/store-file.ts",
+  "desc": "listExpired cursor skipped",
+  "find": "const start = cursor ? names.findIndex((x) => x > cursor) : 0;",
+  "replace": "const start = 0;"
+ },
+ {
+  "id": "S31",
+  "area": "storage",
+  "file": "web/src/lib/storage/media-file.ts",
+  "desc": "media file path-escape guard removed (belt and braces)",
+  "find": "if (!f.startsWith(this.root + sep)) throw new KeyError(\"key escapes root\");",
+  "replace": ""
+ },
+ {
+  "id": "S32",
+  "area": "storage",
+  "file": "web/src/lib/storage/media-file.ts",
+  "desc": "media list limit cap raised",
+  "find": "Math.min(opts.limit ?? 1000, 1000)",
+  "replace": "Math.min(opts.limit ?? 1000, 100000)"
+ },
+ {
+  "id": "S33",
+  "area": "storage",
+  "file": "web/src/lib/storage/media-file.ts",
+  "desc": "mime sidecar not written",
+  "find": "await writeFile(f + SIDE, mime);",
+  "replace": ""
+ },
+ {
+  "id": "S34",
+  "area": "storage",
+  "file": "web/src/lib/storage/media-file.ts",
+  "desc": "deletePrefix keeps sidecar",
+  "find": "await rm(p + SIDE, { force: true });",
+  "replace": ""
+ },
+ {
+  "id": "S35",
+  "area": "storage",
+  "file": "web/src/lib/storage/limits.ts",
+  "desc": "loadLimits accepts zero or negative",
+  "find": "v && Number.isFinite(n) && n > 0 ? Math.floor(n) : d",
+  "replace": "v && Number.isFinite(n) ? Math.floor(n) : d"
+ },
+ {
+  "id": "A01",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "concurrency limit off by one",
+  "find": "if (inFlight < o.maxConcurrent)",
+  "replace": "if (inFlight <= o.maxConcurrent)"
+ },
+ {
+  "id": "A02",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "queue bound off by one",
+  "find": "if (queue.length >= o.maxQueue)",
+  "replace": "if (queue.length > o.maxQueue)"
+ },
+ {
+  "id": "A03",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "breaker needs one extra failure",
+  "find": "failures >= o.breakerFailures) open();",
+  "replace": "failures > o.breakerFailures) open();"
+ },
+ {
+  "id": "A04",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "breaker cooldown ignored (peek)",
+  "find": "if (state === \"open\" && now() - openedAt < o.breakerCooldownMs) throw circuitOpen(); }",
+  "replace": "if (state === \"open\" && false) throw circuitOpen(); }"
+ },
+ {
+  "id": "A05",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "half-open allows many probes",
+  "find": "if (probing) throw circuitOpen(); probing = true;",
+  "replace": "probing = true;"
+ },
+ {
+  "id": "A06",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "failed half-open probe does not reopen",
+  "find": "if (state === \"half-open\" || failures >= o.breakerFailures) open();",
+  "replace": "if (failures >= o.breakerFailures) open();"
+ },
+ {
+  "id": "A07",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "per game request cap off by one",
+  "find": "g.requests + 1 > o.perGame.maxRequests",
+  "replace": "g.requests > o.perGame.maxRequests"
+ },
+ {
+  "id": "A08",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "per game token cap ignores reservation",
+  "find": "g.tokens + reserve > o.perGame.maxTokens",
+  "replace": "g.tokens > o.perGame.maxTokens"
+ },
+ {
+  "id": "A09",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "global window never rolls",
+  "find": "now() - win.start >= o.global.windowMs",
+  "replace": "now() - win.start >= o.global.windowMs + 1e15"
+ },
+ {
+  "id": "A10",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "settle sign flipped",
+  "find": "const delta = actual - reserve;",
+  "replace": "const delta = reserve - actual;"
+ },
+ {
+  "id": "A11",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "failed call keeps token reservation",
+  "find": "if (!settled) settle(req, reserve, 0);",
+  "replace": ""
+ },
+ {
+  "id": "A12",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "one retry too many",
+  "find": "attempt >= o.maxRetries) throw err;",
+  "replace": "attempt > o.maxRetries) throw err;"
+ },
+ {
+  "id": "A13",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "non retryable errors retried",
+  "find": "if (!err.retryable || attempt",
+  "replace": "if (attempt"
+ },
+ {
+  "id": "A14",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "retry ignores overall deadline",
+  "find": "if (Date.now() + wait >= deadline) throw err;",
+  "replace": ""
+ },
+ {
+  "id": "A15",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "queue wait ignores deadline",
+  "find": "Math.max(0, deadline - Date.now())),\n      };",
+  "replace": "1e9),\n      };"
+ },
+ {
+  "id": "A16",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "LRU game map never evicts",
+  "find": "while (games.size > maxGames)",
+  "replace": "while (false)"
+ },
+ {
+  "id": "A17",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "global token cap ignores reservation",
+  "find": "win.tokens + reserve > o.global.maxTokens",
+  "replace": "win.tokens > o.global.maxTokens"
+ },
+ {
+  "id": "A18",
+  "area": "ai",
+  "file": "web/src/lib/ai/gateway.ts",
+  "desc": "retry-after from upstream ignored",
+  "find": "Math.max(backoff, Math.min(err.retryAfterMs, o.backoffMaxMs))",
+  "replace": "backoff"
+ },
+ {
+  "id": "A19",
+  "area": "ai",
+  "file": "web/src/lib/ai/json.ts",
+  "desc": "think block not stripped when unclosed prefix",
+  "find": "s.replace(/<think>[\\s\\S]*?<\\/think>/gi, \"\").replace(/^[\\s\\S]*?<\\/think>/i, \"\")",
+  "replace": "s.replace(/<think>[\\s\\S]*?<\\/think>/gi, \"\")"
+ },
+ {
+  "id": "A20",
+  "area": "ai",
+  "file": "web/src/lib/ai/json.ts",
+  "desc": "brace depth off",
+  "find": "else if (ch === \"}\" && --depth === 0)",
+  "replace": "else if (ch === \"}\" && --depth === 1)"
+ },
+ {
+  "id": "A21",
+  "area": "ai",
+  "file": "web/src/lib/ai/json.ts",
+  "desc": "escape handling broken in strings",
+  "find": "if (esc) esc = false; else if (ch === \"\\\\\") esc = true;",
+  "replace": "if (esc) esc = false; else if (false) esc = true;"
+ },
+ {
+  "id": "A22",
+  "area": "ai",
+  "file": "web/src/lib/ai/openai-compatible.ts",
+  "desc": "response size cap off",
+  "find": "if (total > max)",
+  "replace": "if (total > max * 1000)"
+ },
+ {
+  "id": "A23",
+  "area": "ai",
+  "file": "web/src/lib/ai/openai-compatible.ts",
+  "desc": "max_tokens not clamped to adapter cap",
+  "find": "max_tokens: Math.min(req.maxOutputTokens ?? o.maxOutputTokens, o.maxOutputTokens),",
+  "replace": "max_tokens: req.maxOutputTokens ?? o.maxOutputTokens,"
+ },
+ {
+  "id": "A24",
+  "area": "ai",
+  "file": "web/src/lib/ai/openai-compatible.ts",
+  "desc": "429 treated as plain http failure",
+  "find": "if (res.status === 429) {",
+  "replace": "if (res.status === 4290) {"
+ },
+ {
+  "id": "A25",
+  "area": "ai",
+  "file": "web/src/lib/ai/openai-compatible.ts",
+  "desc": "api key sent when unset / header dropped",
+  "find": "...(o.apiKey ? { authorization: `Bearer ${o.apiKey}` } : {})",
+  "replace": ""
+ },
+ {
+  "id": "Y01",
+  "area": "security",
+  "file": "web/src/lib/security/rate-limit.ts",
+  "desc": "bucket refill uncapped",
+  "find": "Math.min(rule.capacity, b.tokens +",
+  "replace": "Math.min(rule.capacity * 100, b.tokens +"
+ },
+ {
+  "id": "Y02",
+  "area": "security",
+  "file": "web/src/lib/security/rate-limit.ts",
+  "desc": "last token refused (<= becomes <)",
+  "find": "if (cost <= b.tokens && cost <= rule.capacity)",
+  "replace": "if (cost < b.tokens && cost <= rule.capacity)"
+ },
+ {
+  "id": "Y03",
+  "area": "security",
+  "file": "web/src/lib/security/rate-limit.ts",
+  "desc": "retryAfter rounds down",
+  "find": "Math.ceil((missing / rule.refillPerSec) * 1000)",
+  "replace": "Math.floor((missing / rule.refillPerSec) * 1000)"
+ },
+ {
+  "id": "Y04",
+  "area": "security",
+  "file": "web/src/lib/security/rate-limit.ts",
+  "desc": "LRU order not refreshed on use",
+  "find": "this.buckets.delete(id); // re-insert below so Map order is least recently used first",
+  "replace": ""
+ },
+ {
+  "id": "Y05",
+  "area": "security",
+  "file": "web/src/lib/security/rate-limit.ts",
+  "desc": "bucket key ignores route class",
+  "find": "const id = `${cls}|${key}`;",
+  "replace": "const id = `${key}`;"
+ },
+ {
+  "id": "Y06",
+  "area": "security",
+  "file": "web/src/lib/security/rate-limit.ts",
+  "desc": "max keys never enforced",
+  "find": "while (this.buckets.size > this.maxKeys)",
+  "replace": "while (false)"
+ },
+ {
+  "id": "Y07",
+  "area": "security",
+  "file": "web/src/lib/security/safe-compare.ts",
+  "desc": "empty strings match",
+  "find": "a.length === 0 || b.length === 0",
+  "replace": "false"
+ },
+ {
+  "id": "Y08",
+  "area": "security",
+  "file": "web/src/lib/security/safe-compare.ts",
+  "desc": "compare only first char (non constant, weak)",
+  "find": "return timingSafeEqual(digest(a), digest(b));",
+  "replace": "return timingSafeEqual(digest(a[0]), digest(b[0]));"
+ },
+ {
+  "id": "Y09",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "HSTS sent without TLS",
+  "find": "if (o.tls) h[\"Strict-Transport-Security\"]",
+  "replace": "if (!o.tls) h[\"Strict-Transport-Security\"]"
+ },
+ {
+  "id": "Y10",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "X-Frame-Options SAMEORIGIN",
+  "find": "\"X-Frame-Options\": \"DENY\"",
+  "replace": "\"X-Frame-Options\": \"SAMEORIGIN\""
+ },
+ {
+  "id": "Y11",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "frame-ancestors self",
+  "find": "frame-ancestors 'none'",
+  "replace": "frame-ancestors 'self'"
+ },
+ {
+  "id": "Y12",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "camera allowed on /playground (regex too loose)",
+  "find": "/^\\/play(\\/|$)/",
+  "replace": "/^\\/play/"
+ },
+ {
+  "id": "Y13",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "API responses cacheable",
+  "find": "o.path.startsWith(\"/api/\")",
+  "replace": "o.path.startsWith(\"/apix/\")"
+ },
+ {
+  "id": "Y14",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "nonce not used in strict mode",
+  "find": "`script-src 'self' 'nonce-${o.nonce}' 'strict-dynamic'",
+  "replace": "`script-src 'self' 'unsafe-inline' 'strict-dynamic'"
+ },
+ {
+  "id": "Y15",
+  "area": "security",
+  "file": "web/src/lib/security/headers.ts",
+  "desc": "unsafe-eval allowed in production",
+  "find": "${o.dev ? \" 'unsafe-eval'\" : \"\"}`\n    : `script-src 'self' 'unsafe-inline'${o.dev ? \" 'unsafe-eval'\" : \"\"}`",
+  "replace": "${\" 'unsafe-eval'\"}`\n    : `script-src 'self' 'unsafe-inline'${\" 'unsafe-eval'\"}`"
+ },
+ {
+  "id": "Y16",
+  "area": "security",
+  "file": "web/src/lib/security/logger.ts",
+  "desc": "token keys no longer redacted",
+  "find": "\"token\", \"authorization\"",
+  "replace": "\"authorization\""
+ },
+ {
+  "id": "Y17",
+  "area": "security",
+  "file": "web/src/lib/security/logger.ts",
+  "desc": "cookie header text pattern dropped",
+  "find": "[/(cookie\\s*[:=]\\s*)[^\\n]+/gi, `$1${REDACTED}`],",
+  "replace": ""
+ },
+ {
+  "id": "Y18",
+  "area": "security",
+  "file": "web/src/lib/security/logger.ts",
+  "desc": "postgres password pattern dropped",
+  "find": "[/(postgres(?:ql)?:\\/\\/[^:\\s]+:)[^@\\s]+@/gi, `$1${REDACTED}@`],",
+  "replace": ""
+ },
+ {
+  "id": "Y19",
+  "area": "security",
+  "file": "web/src/lib/security/logger.ts",
+  "desc": "cycle guard dropped (depth cap only)",
+  "find": "if (seen.has(v)) return \"[cycle]\";",
+  "replace": ""
+ },
+ {
+  "id": "Y20",
+  "area": "security",
+  "file": "web/src/lib/security/logger.ts",
+  "desc": "override code field not redacted",
+  "find": "(k === \"code\" && overrideShape)",
+  "replace": "(false)"
+ },
+ {
+  "id": "Y21",
+  "area": "security",
+  "file": "web/src/lib/security/logger.ts",
+  "desc": "long strings not truncated",
+  "find": "v.length > MAX_STRING ? v.slice(0, MAX_STRING)",
+  "replace": "v.length > MAX_STRING * 1000 ? v.slice(0, MAX_STRING)"
+ },
+ {
+  "id": "Y22",
+  "area": "security",
+  "file": "web/src/lib/security/capacity.ts",
+  "desc": "spare cells not added",
+  "find": "Math.ceil(p.games / (p.cellCapacity * p.softFill)) + p.spare",
+  "replace": "Math.ceil(p.games / (p.cellCapacity * p.softFill))"
+ },
+ {
+  "id": "Y23",
+  "area": "security",
+  "file": "web/src/lib/security/capacity.ts",
+  "desc": "placement allows cell at soft limit",
+  "find": "c.active < limit)",
+  "replace": "c.active <= limit)"
+ },
+ {
+  "id": "Y24",
+  "area": "security",
+  "file": "web/src/lib/security/capacity.ts",
+  "desc": "placement ignores draining status",
+  "find": "c.status === \"open\" && c.active < limit",
+  "replace": "c.active < limit"
+ },
+ {
+  "id": "Y25",
+  "area": "security",
+  "file": "web/src/lib/security/capacity.ts",
+  "desc": "pods not rounded to zone multiple",
+  "find": "return Math.ceil(n / p.zones) * p.zones;",
+  "replace": "return n;"
+ },
+ {
+  "id": "U01",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "backoff cap 15s becomes 30s",
+  "find": "Math.min(15000,",
+  "replace": "Math.min(30000,"
+ },
+ {
+  "id": "U02",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "failed status needs 4 failures",
+  "find": "i.failures >= 3 ? \"failed\"",
+  "replace": "i.failures > 3 ? \"failed\""
+ },
+ {
+  "id": "U03",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "join code length 8",
+  "find": "toUpperCase().replace(/[^A-Z0-9]/g, \"\").slice(0, 6)",
+  "replace": "toUpperCase().replace(/[^A-Z0-9]/g, \"\").slice(0, 8)"
+ },
+ {
+  "id": "U04",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "photo without consent can join",
+  "find": "if (i.photoBlob && !i.photoConsent) return false;",
+  "replace": ""
+ },
+ {
+  "id": "U05",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "wizard min guests 3",
+  "find": "n < 4) return \"Plan for at least 4 guests",
+  "replace": "n < 3) return \"Plan for at least 4 guests"
+ },
+ {
+  "id": "U06",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "wizard min adults 1",
+  "find": "v.expected.adults < 2",
+  "replace": "v.expected.adults < 1"
+ },
+ {
+  "id": "U07",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "friendlyError long message passthrough",
+  "find": "m.length > 160",
+  "replace": "m.length > 1600"
+ },
+ {
+  "id": "U08",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "tilt range shifted",
+  "find": "% 5) - 2;",
+  "replace": "% 5) - 1;"
+ },
+ {
+  "id": "U09",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "nextPhaseTitle fallback empty",
+  "find": "?? \"the end\"",
+  "replace": "?? \"\""
+ },
+ {
+  "id": "U10",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "parseCreds accepts non-string token",
+  "find": "typeof v.tok === \"string\" ? { pid",
+  "replace": "true ? { pid"
+ },
+ {
+  "id": "U11",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "plainText keeps DEL",
+  "find": "\\u000E-\\u001F\\u007F]/g, \"\")",
+  "replace": "\\u000E-\\u001F]/g, \"\")"
+ },
+ {
+  "id": "U12",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "ballot complete at 2 of 3",
+  "find": "complete: done === 3",
+  "replace": "complete: done >= 2"
+ },
+ {
+  "id": "U13",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "empty-name join allowed",
+  "find": "if (!i.name.trim()) return false;",
+  "replace": ""
+ },
+ {
+  "id": "U14",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "own backstory text optional",
+  "find": "if (i.age !== \"little\" && i.mode !== \"gm\" && !i.text.trim()) return false;",
+  "replace": ""
+ },
+ {
+  "id": "U15",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "wizard budget negative allowed",
+  "find": "v.budget < 0)",
+  "replace": "v.budget < -1e9)"
+ },
+ {
+  "id": "U16",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "credential header names swapped",
+  "find": "{ \"x-player-id\": c.pid, \"x-player-token\": c.tok }",
+  "replace": "{ \"x-player-id\": c.tok, \"x-player-token\": c.pid }"
+ },
+ {
+  "id": "U17",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "degraded notice priority swapped",
+  "find": "if (s.aiDegraded) return \"The storyteller AI is resting",
+  "replace": "if (false) return \"The storyteller AI is resting"
+ },
+ {
+  "id": "U18",
+  "area": "ui",
+  "file": "web/src/lib/client.ts",
+  "desc": "api GET sends body method wrong",
+  "find": "method: body === undefined ? \"GET\" : \"POST\",",
+  "replace": "method: \"POST\","
+ },
+ {
+  "id": "H01",
+  "area": "health",
+  "file": "web/src/app/api/readyz/route.ts",
+  "desc": "readyz returns 200 when not ready",
+  "find": "{ status: ready ? 200 : 503,",
+  "replace": "{ status: 200,"
+ },
+ {
+  "id": "H02",
+  "area": "health",
+  "file": "web/src/app/api/readyz/route.ts",
+  "desc": "readyz ready if either store ok",
+  "find": "store === \"ok\" && media === \"ok\"",
+  "replace": "store === \"ok\" || media === \"ok\""
+ },
+ {
+  "id": "H03",
+  "area": "health",
+  "file": "web/src/app/api/readyz/route.ts",
+  "desc": "readyz probe timeout 200s",
+  "find": "const TIMEOUT_MS = 2000;",
+  "replace": "const TIMEOUT_MS = 200000;"
+ },
+ {
+  "id": "H04",
+  "area": "health",
+  "file": "web/src/app/api/readyz/route.ts",
+  "desc": "readyz not no-store",
+  "find": "headers: { \"Cache-Control\": \"no-store\" } },\n  );",
+  "replace": "},\n  );"
+ },
+ {
+  "id": "H05",
+  "area": "health",
+  "file": "web/src/app/api/readyz/route.ts",
+  "desc": "readyz store adapter name fixed to memory",
+  "find": "env.STORE_ADAPTER || (env.ROOMS_TABLE ? \"dynamo\" : \"memory\")",
+  "replace": "\"memory\""
+ },
+ {
+  "id": "H06",
+  "area": "health",
+  "file": "web/src/app/api/readyz/route.ts",
+  "desc": "readyz leaks error text (checks become strings)",
+  "find": "await withTimeout(fn(), label);\n    return \"ok\";",
+  "replace": "await fn();\n    return \"ok\";"
+ },
+ {
+  "id": "H07",
+  "area": "health",
+  "file": "web/src/app/api/healthz/route.ts",
+  "desc": "healthz cacheable",
+  "find": "{ headers: { \"Cache-Control\": \"no-store\" } }",
+  "replace": "{}"
+ }
+]

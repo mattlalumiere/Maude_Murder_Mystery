@@ -51,13 +51,13 @@ npm run test:smoke             # engine tests
 
 Without `ROOMS_TABLE` it uses an in-memory store. Without `BEDROCK_MODEL_ID` it uses the built-in sample case. With `MEDIA_PROVIDER=mock` (the default locally) pictures are placeholder cards, so the whole flow works without AWS; set `MEDIA_PROVIDER=bedrock` on AWS for Nova Canvas, Nova Reel, and Rekognition. Hosts sign in with Google, Apple, or Facebook (Auth.js); guests join with a 4-letter room code and no account.
 
-Deploy to AWS (Lambda, DynamoDB with 24-hour TTL, S3, Bedrock) with SST:
+### Deploying for a real party
 
-```bash
-cd web && npx sst deploy --stage party
-```
+The first-iteration path is AWS with SST (Lambda, DynamoDB with 24-hour TTL, S3, Bedrock). Follow **[docs/RUNBOOK.md](docs/RUNBOOK.md)**: deploy, sign-in setup, a dry run on a small budget, party-day checklist, and rollback. It has not been run against real AWS yet, so do the dry run before the party.
 
-See `web/DESIGN.md` for architecture, cost, and security notes. The AWS pieces have not been deployed yet.
+`web/DESIGN.md` covers architecture, cost, and security notes. A longer-term portable platform design (cells, Postgres, S3-compatible storage, Kubernetes and Helm, OpenTofu) is in [docs/platform/](docs/platform/README.md); its cloud code is validated but never applied.
+
+**Host quick card:** [docs/HOST_CARD.md](docs/HOST_CARD.md) is a one-page guide to print for party day.
 
 ## How a night works
 
@@ -74,7 +74,7 @@ See [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for the full host and player gu
 - Secrets are fictional and never about real people's lives or relationships.
 - Alcohol is optional with a substitute, sips only, with water rounds and designated-driver reminders. `SAFE` drops all drinking and dares instantly.
 - Kids and toddlers never take part in alcohol mechanics and get G-rated cards. The "murder" is a cartoon pratfall.
-- Photos need explicit consent (a parent or guardian for anyone under 18), are moderated, are never shown to other players, expire after one day, and can be deleted by the host or the player at any time. Only generated cartoon art is shown on screens.
+- Photos need explicit consent and are never shown to other players; only generated cartoon art appears on screens. **Photo likenesses for players under 18 are off by default** (`ALLOW_MINOR_PHOTOS=true` turns them on, and only with a real guardian-consent process). Uploads have location and camera metadata stripped on the server, are moderated (fail closed when moderation is on), and are deleted when a player is removed, when the reveal is done, or on request. Plain-language notice: `/privacy`.
 - AI spending is capped server-side at the host's budget.
 
 ## Repository layout
@@ -86,6 +86,9 @@ See [docs/INSTRUCTIONS.md](docs/INSTRUCTIONS.md) for the full host and player gu
 | `build-portable.sh`, `PORTABLE_PROMPT.md` | Generator and output for paste-in chatbots |
 | `docs/INSTRUCTIONS.md` | Host and player guide |
 | `web/` | Next.js app, engine, AWS infrastructure, design doc |
+| `docs/RUNBOOK.md`, `docs/HOST_CARD.md` | AWS deploy runbook and the one-page host card |
+| `docs/council/` | Expert council reports (launch readiness, 2026-10-23) |
+| `docs/platform/` | Portable multi-cloud platform design and specs |
 | `AGENTS.md`, `CLAUDE.md` | Guidance for AI coding agents |
 
 ## Roadmap

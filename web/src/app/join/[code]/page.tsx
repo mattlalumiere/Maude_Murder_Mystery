@@ -1,14 +1,20 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { use, useState } from "react";
-import { PhotoPicker, resizeToJpeg, uploadPhoto } from "@/components/PhotoUploader";
-import { api } from "@/lib/client";
+import { PhotoPicker, uploadPhoto } from "@/components/PhotoUploader";
+import { Badge, Brand, Button, Card, ErrorNote, Field, Notice } from "@/components/kit";
+import { canJoin, joinGame, normalizeCode, saveCreds, useAction, useDocTitle } from "@/lib/client";
 import type { AgeGroup } from "@/lib/types";
 
 type Mode = "gm" | "hint" | "own";
+const MODES: [Mode, string, string][] = [
+  ["gm", "Surprise me", "The Game Master invents everything."],
+  ["hint", "Give the GM an idea", "Hobbies, quirks, a catchphrase. It gets woven in."],
+  ["own", "I will write my own", "Your words go on your card as written."],
+];
 
 export default function JoinBuilder({ params }: { params: Promise<{ code: string }> }) {
-  const code = use(params).code.toUpperCase();
+  const code = normalizeCode(use(params).code);
   const router = useRouter();
   const [name, setName] = useState("");
   const [age, setAge] = useState<AgeGroup>("adult");
@@ -16,75 +22,82 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
   const [mode, setMode] = useState<Mode>("gm");
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<{ blob: Blob | null; consent: "self" | "guardian" | null }>({ blob: null, consent: null });
-  const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [photoNote, setPhotoNote] = useState("");
+  const { busy, err, run } = useAction();
+  useDocTitle(`Join ${code}`);
 
-  const isAdult = age === "adult";
   const toddler = age === "little";
-  const photoReady = !photo.blob || !!photo.consent;
+  const ok = canJoin({ name, age, mode, text, photoBlob: !!photo.blob, photoConsent: !!photo.consent });
 
   async function join() {
-    setBusy(true); setErr("");
-    try {
-      const r = await api<{ playerId: string; token: string }>(`/api/rooms/${code}/join`, {
-        name, ageGroup: age, wantsVictim,
-        profile: { backstoryMode: mode, backstory: mode === "gm" ? "" : text },
-      });
-      const creds = { pid: r.playerId, tok: r.token };
-      try { localStorage.setItem(`mm:${code}`, JSON.stringify(creds)); } catch {}
-      if (photo.blob && photo.consent) {
-        try { await uploadPhoto(code, creds, photo.blob, photo.consent); }
-        catch (e) { setErr(`You are in, but the photo was not accepted: ${(e as Error).message}`); setBusy(false); router.push(`/play/${code}`); return; }
-      }
-      router.push(`/play/${code}`);
-    } catch (e) { setErr((e as Error).message); setBusy(false); }
+    const r = await run(() => joinGame(code, {
+      name: name.trim(), ageGroup: age, wantsVictim,
+      profile: { backstoryMode: toddler ? "gm" : mode, backstory: mode === "gm" || toddler ? "" : text },
+    }));
+    if (!r) return;
+    const creds = { pid: r.playerId, tok: r.token };
+    saveCreds(code, creds);
+    if (photo.blob && photo.consent) {
+      try { await uploadPhoto(code, creds, photo.blob, photo.consent); }
+      catch (e) { setPhotoNote(`You are in! The photo was not accepted (${(e as Error).message}). You can try again from your card.`); }
+    }
+    router.push(`/play/${code}`);
   }
 
   return (
-    <main>
-      <p className="muted">Room {code}</p>
+    <main className="sc-page" data-testid="join-builder">
+      <Brand />
+      <p className="sc-badge-room"><Badge tone="gold" data-testid="join-room">Room {code}</Badge></p>
       <h1>Build your character</h1>
-      <p className="muted">The AI Game Master will cast you as a suspect, witness, or helper. Tell us a little about yourself, or let it surprise you.</p>
+      <p className="sc-lead">The Game Master will cast you as a suspect, witness or helper. Tell us a little, or be surprised.</p>
 
-      <div className="card">
-        <label htmlFor="n">Your name</label>
-        <input id="n" value={name} maxLength={24} onChange={(e) => setName(e.target.value)} />
-        <label htmlFor="a">Your age group</label>
-        <select id="a" value={age} onChange={(e) => setAge(e.target.value as AgeGroup)}>
-          <option value="adult">Grown-up</option><option value="teen">Teen (13-15)</option><option value="kid">Kid (6-12)</option><option value="little">Little kid (1-5), a grown-up joins for them</option>
-        </select>
-        {(age === "kid" || age === "teen") && (
-          <label><input type="checkbox" checked={wantsVictim} onChange={(e) => setWV(e.target.checked)} />I want to be the victim and come back as the Ghost!</label>
+      <div className="sc-gap">
+        <Card title="Who are you?">
+          <Field label="Your name" required>
+            <input value={name} maxLength={24} autoComplete="given-name" data-testid="join-name" onChange={(e) => setName(e.target.value)} />
+          </Field>
+          <Field label="Your age group">
+            <select value={age} data-testid="join-age" onChange={(e) => setAge(e.target.value as AgeGroup)}>
+              <option value="adult">Grown-up</option><option value="teen">Teen (13 to 15)</option><option value="kid">Kid (6 to 12)</option><option value="little">Little one (1 to 5), a grown-up helps</option>
+            </select>
+          </Field>
+          {(age === "kid" || age === "teen") && (
+            <label className="sc-check">
+              <input type="checkbox" checked={wantsVictim} data-testid="join-victim" onChange={(e) => setWV(e.target.checked)} />
+              <span>I want to be the victim and come back as the Ghost!</span>
+            </label>
+          )}
+        </Card>
+
+        {!toddler && (
+          <Card title="Your backstory">
+            <fieldset className="sc-choices" style={{ border: 0, padding: 0, margin: 0 }}>
+              <legend className="sr-only">How should your backstory be written?</legend>
+              {MODES.map(([m, t, d]) => (
+                <label key={m} className="sc-choice">
+                  <input type="radio" name="mode" checked={mode === m} onChange={() => setMode(m)} data-testid={`join-mode-${m}`} />
+                  <span className="sc-choice__face"><span className="sc-choice__title">{t}</span><span className="sc-choice__desc">{d}</span></span>
+                </label>
+              ))}
+            </fieldset>
+            {mode !== "gm" && (
+              <Field label={mode === "hint" ? "Your idea" : "Your backstory"} hint={`${text.length} of 600. Keep it fun and made up. Please do not share real secrets about anyone.`}>
+                <textarea rows={4} maxLength={600} value={text} data-testid="join-text"
+                  placeholder={mode === "hint" ? "I am obsessed with sourdough and tell everyone about my starter." : "I am a retired circus strongman who now runs a bakery."}
+                  onChange={(e) => setText(e.target.value)} />
+              </Field>
+            )}
+          </Card>
         )}
+
+        <PhotoPicker isAdult={age === "adult"} onChange={setPhoto} />
       </div>
 
-      {!toddler && (
-        <div className="card">
-          <h2 style={{ marginTop: 0 }}>Your backstory</h2>
-          {([
-            ["gm", "Surprise me", "The GM invents everything."],
-            ["hint", "Give the GM an idea", "Hobbies, quirks, a catchphrase. The GM weaves it in."],
-            ["own", "I'll write my own", "Your words go on your card as written."],
-          ] as [Mode, string, string][]).map(([m, t, d]) => (
-            <label key={m} style={{ color: "var(--fg)" }}>
-              <input type="radio" name="mode" checked={mode === m} onChange={() => setMode(m)} /><b>{t}</b> <span className="muted">{d}</span>
-            </label>
-          ))}
-          {mode !== "gm" && (
-            <>
-              <textarea rows={4} maxLength={600} value={text} onChange={(e) => setText(e.target.value)}
-                placeholder={mode === "hint" ? "e.g. I'm obsessed with sourdough and tell everyone about my starter." : "e.g. I'm a retired circus strongman who now runs a bakery."}
-                style={{ width: "100%", font: "inherit", padding: 12, borderRadius: 10, border: "1px solid var(--line)", background: "var(--card)", color: "var(--fg)" }} />
-              <p className="muted" style={{ fontSize: ".85rem" }}>{text.length}/600. Keep it fun and fictional. Please do not include real secrets about yourself or anyone else.</p>
-            </>
-          )}
-        </div>
-      )}
-
-      <PhotoPicker isAdult={isAdult} onChange={setPhoto} />
-
-      {err && <p className="err">{err}</p>}
-      <p><button disabled={busy || !name.trim() || !photoReady || (mode !== "gm" && !toddler && !text.trim())} onClick={join}>Join the party</button></p>
+      {err && <ErrorNote data-testid="join-error">{err}</ErrorNote>}
+      {photoNote && <Notice data-testid="join-photo-note">{photoNote}</Notice>}
+      <div className="sc-sticky">
+        <Button size="lg" loading={busy} disabled={!ok} onClick={join} data-testid="join-submit">Join the party</Button>
+      </div>
     </main>
   );
 }

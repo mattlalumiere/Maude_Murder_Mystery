@@ -1,78 +1,99 @@
 "use client";
+import { RulesCard } from "@/components/RulesCard";
 import { use } from "react";
+import type { ScreenState } from "@/app/_views";
 import { Avatar, MediaView } from "@/components/Media";
 import { Qr } from "@/components/Qr";
-import { useRoom } from "@/lib/client";
-
-type S = {
-  version: number; code: string; phase: string; phaseTitle: string; paused: boolean; narration?: string; title?: string; setting?: string;
-  lobbyNames: string[]; clues: { id: string; round: number; text: string }[];
-  roster: { playerName: string; characterName: string; house: string; tease: string; avatarId?: string }[];
-  partyName: string; media: { id: string; kind: string; phase: string; caption: string; mime?: string }[];
-  ballotsIn: number; totalPlayers: number; ballotsOpen: boolean;
-  reveal?: { killer?: string; method?: string; motive?: string; story: string; scores: { name: string; points: number }[]; awards: { award: string; to: string }[] };
-};
+import { Badge, Candle, ConnectionCandle, ErrorNote, Fog, PaperClue, Skeleton } from "@/components/kit";
+import { groupByHouse, hostName, normalizeCode, originUrl, plainText, tilt, useDocTitle, useRoom, useTvSurface } from "@/lib/client";
 
 export default function Screen({ params }: { params: Promise<{ code: string }> }) {
-  const code = use(params).code.toUpperCase();
-  const { state, error } = useRoom<S>(code, "screen");
-  if (!state) return <main className="wide big"><p>{error || "Loading..."}</p></main>;
-  const houses = [...new Set(state.roster.map((r) => r.house))];
+  const code = normalizeCode(use(params).code);
+  const { state, error, status } = useRoom<ScreenState>(code, "screen");
+  useTvSurface();
+  useDocTitle(`Big screen ${code}`);
+
+  if (!state) {
+    return (
+      <main className="sc-tv" data-testid="tv-loading">
+        <ConnectionCandle status={status} />
+        <Fog />
+        <div><Skeleton lines={2} label="Lighting the candles" />{status === "failed" && <ErrorNote>{error}</ErrorNote>}</div>
+      </main>
+    );
+  }
+
+  const lobby = state.phase === "lobby";
+  const joinUrl = `${originUrl()}/join/${state.code}`;
   const scenes = state.media.filter((m) => m.kind !== "avatar");
   const hero = [...scenes].reverse().find((m) => m.phase === state.phase) ?? scenes[scenes.length - 1];
+  const recent = state.clues.slice(-4);
 
-  return (
-    <main className="wide big">
-      {state.phase === "lobby" ? (
-        <>
-          <h1>{state.partyName}</h1>
-          <p>Scan to build your character, or go to {typeof location !== "undefined" ? location.host : ""}/join/{state.code}</p>
-          {typeof location !== "undefined" && <Qr text={`${location.origin}/join/${state.code}`} size={260} />}
-          <div className="code">{state.code}</div>
-          <p>{state.lobbyNames.join(" · ") || "Waiting for guests..."}</p>
-        </>
-      ) : (
-        <>
-          <p className="muted" style={{ margin: 0 }}>{state.partyName} · Room {state.code} {state.paused && "· PAUSED"}</p>
-          <h1>{state.phaseTitle}</h1>
-          {state.narration && <p>{state.narration}</p>}
-          {state.ballotsOpen && <p>Accusations in: {state.ballotsIn} / {state.totalPlayers}</p>}
-
-          {state.reveal && (
-            <div className="card">
-              <h1>It was {state.reveal.killer}!</h1>
-              <p><b>How:</b> {state.reveal.method}</p><p><b>Why:</b> {state.reveal.motive}</p><p>{state.reveal.story}</p>
-              <div className="grid">
-                <div><h2>Scores</h2><ul className="clean">{state.reveal.scores.slice(0, 8).map((s) => <li key={s.name}>{s.name}: <b>{s.points}</b></li>)}</ul></div>
-                <div><h2>Awards</h2><ul className="clean">{state.reveal.awards.map((a, i) => <li key={i}>🏆 {a.award}: <b>{a.to}</b></li>)}</ul></div>
-              </div>
-            </div>
-          )}
-
-          {hero && (
-            <div className="card"><MediaView code={code} m={hero} /></div>
-          )}
-
-          {state.clues.length > 0 && (
-            <div className="card">
-              <h2 style={{ marginTop: 0 }}>Clues</h2>
-              <ul className="clean">{state.clues.map((c) => <li className="clue" key={c.id}>{c.text}</li>)}</ul>
-            </div>
-          )}
-
-          <h2>The cast</h2>
-          <div className="grid">
-            {houses.map((h) => (
-              <div className="card" key={h}>
-                <b>{h}</b>
-                <ul className="clean">{state.roster.filter((r) => r.house === h).map((r) => (
-                  <li key={r.characterName} className="row"><Avatar code={code} id={r.avatarId} size={48} alt={r.characterName} /><span>{r.characterName}<br /><span className="muted">played by {r.playerName}</span></span></li>
-                ))}</ul>
-              </div>
-            ))}
+  if (lobby) {
+    return (
+      <main className="sc-tv" data-testid="tv-lobby">
+        <ConnectionCandle status={status} />
+        <Fog opacity={0.18} />
+        <div className="sc-tv-top"><strong>{plainText(state.partyName)}</strong><span><Candle scale={1} /></span></div>
+        <div className="sc-tv-lobby">
+          <div>
+            <h1 className="sc-tv-title">Join the mystery</h1>
+            <p className="sc-tv-narr">Scan the picture with your phone camera, or visit</p>
+            <p className="sc-tv-url" data-testid="tv-url">{hostName()}/join/{state.code}</p>
+            <p className="sc-tv-code" data-testid="tv-code" aria-label={`Room code ${state.code.split("").join(" ")}`}>{state.code}</p>
           </div>
-        </>
-      )}
+          <Qr text={joinUrl} size={380} className="sc-tv-qr" testId="tv-qr" />
+        </div>
+        <section aria-label="Guests who have arrived" data-testid="tv-guests">
+          <ul className="sc-tv-names">{state.lobbyNames.map((n, i) => <li key={`${n}-${i}`}>{plainText(n)}</li>)}</ul>
+          {state.lobbyNames.length === 0 && <p className="sc-tv-url">Waiting for the first guest...</p>}
+        </section>
+      </main>
+    );
+  }
+
+  const houses = groupByHouse(state.roster);
+  return (
+    <main className="sc-tv" data-testid="tv-game" data-phase={state.phase}>
+      <ConnectionCandle status={status} />
+      <Fog opacity={0.14} />
+      <div className="sc-tv-top">
+        <strong>{plainText(state.partyName)}</strong>
+        <span>Room {state.code} {state.paused && <Badge tone="blood" data-testid="tv-paused">Paused</Badge>}</span>
+      </div>
+
+      <div className="sc-tv-main">
+        <div>
+          <h1 className="sc-tv-title" data-testid="tv-phase">{state.phaseTitle}</h1>
+          {state.narration && <p className="sc-tv-narr" data-testid="tv-narration">{plainText(state.narration)}</p>}
+          {(state.phase === "cards" || state.phase === "act1") && <RulesCard drinking={state.drinking} big />}
+          {state.ballotsOpen && <p className="sc-tv-votes" data-testid="tv-ballots" role="status">Accusations in: {state.ballotsIn} of {state.totalPlayers}</p>}
+          {hero && !state.reveal && <div className="sc-tv-hero" style={{ marginTop: "var(--space-4)" }}><MediaView code={code} m={hero} /></div>}
+        </div>
+
+        {state.reveal ? (
+          <div className="sc-tv-reveal" data-testid="tv-reveal">
+            <p className="sc-reveal-name" style={{ fontSize: "clamp(3rem,5vw,5rem)" }}>It was {plainText(state.reveal.killer ?? "")}!</p>
+            <p className="sc-tv-narr"><b>How:</b> {plainText(state.reveal.method ?? "")}<br /><b>Why:</b> {plainText(state.reveal.motive ?? "")}</p>
+            <h2>Scores</h2>
+            <ol className="sc-list">{state.reveal.scores.slice(0, 6).map((s) => <li key={s.name}><span className="sc-grow">{plainText(s.name)}</span><b>{s.points}</b></li>)}</ol>
+            <h2>Awards</h2>
+            <ul className="sc-list">{state.reveal.awards.slice(0, 5).map((a, i) => <li key={i}><span className="sc-grow">{plainText(a.award)}</span><b>{plainText(a.to)}</b></li>)}</ul>
+          </div>
+        ) : (
+          <section className="sc-tv-clues" aria-label="Clues" data-testid="tv-clues">
+            {recent.map((c, i) => <PaperClue key={c.id} title={plainText(c.text)} label={`Exhibit ${String.fromCharCode(65 + ((state.clues.length - recent.length + i) % 26))}`} tilt={tilt(c.id)} animateIn={i === recent.length - 1} />)}
+          </section>
+        )}
+      </div>
+
+      <section aria-label="The cast" data-testid="tv-cast">
+        <ul className="sc-tv-cast">
+          {houses.flatMap((h) => h.members).slice(0, 12).map((r) => (
+            <li key={r.characterName}><Avatar code={code} id={r.avatarId} size={64} alt={r.characterName} /><span>{plainText(r.characterName)}<small>{plainText(r.playerName)}</small></span></li>
+          ))}
+        </ul>
+      </section>
     </main>
   );
 }

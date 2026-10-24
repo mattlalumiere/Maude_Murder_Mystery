@@ -167,7 +167,13 @@ export interface Result {
 }
 
 export interface Room {
+  /** Short join code shown to users; resolves to gameId through the directory. */
   code: string;
+  /** Internal 26 char ULID, never shown to users. Tenant key component. */
+  gameId: string;
+  /** Cell and region that own this game for its whole life. */
+  cellId: string;
+  regionId: string;
   version: number;
   createdAt: number;
   ttl: number;
@@ -188,5 +194,7 @@ export interface Room {
   caseSource?: "sample" | "bedrock";
   releasedClueIds: string[];
   ballotsOpen: boolean;
+  /** Set (epoch ms) while the host-triggered case generation is running; null/undefined otherwise. */
+  generating?: number;
   result?: Result;
 }

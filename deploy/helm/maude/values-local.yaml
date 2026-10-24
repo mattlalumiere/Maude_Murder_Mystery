@@ -1,0 +1,32 @@
+# kind: one node, file adapters, no cloud, host-served AI model.
+replicaCount: 1
+cell:
+  id: local-0
+  region: local
+config:
+  STORE_ADAPTER: file
+  MEDIA_ADAPTER: file
+  AI_TEXT_ADAPTER: sample
+  STORE_FILE_DIR: /data/state
+  MEDIA_FILE_DIR: /data/media
+  ALLOW_DEV_LOGIN: "true"
+secrets:
+  mode: none
+localData:
+  enabled: true
+autoscaling:
+  enabled: false
+pdb:
+  enabled: false
+topologySpread:
+  enabled: false
+networkPolicy:
+  enabled: false
+cleanup:
+  enabled: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 640Mi

@@ -21,12 +21,15 @@ Murder Mystery Night is a party game for mixed-age groups (10-20 adults aged 20-
 | `build-portable.sh` | Generates `PORTABLE_PROMPT.md` (one paste-in file for other chatbots) |
 | `PORTABLE_PROMPT.md` | Generated. Never edit by hand; rerun the script |
 | `docs/INSTRUCTIONS.md` | Step-by-step guide for hosts and players |
+| `.claude/skills/expert-council/SKILL.md` | Repeatable review skill: asks for an objective, picks 3 project-specific experts, returns a scored verdict and plan. Reports may be saved in `docs/council/` |
 | `web/` | Next.js app (see `web/DESIGN.md`) |
 | `web/src/lib/engine.ts` | State machine, casting, scoring, override, and the only view projections clients may see |
 | `web/src/lib/store.ts` | Storage interface: in-memory locally, DynamoDB on AWS (optimistic locking) |
 | `web/src/lib/budget.ts` | Pure cost estimates, tiers, `recommend()` and `fitPlan()` (shared by client and server) |
 | `web/src/lib/media-jobs.ts`, `media-runner.ts` | Queues avatar, scene, and video jobs per phase; runner claims one job at a time and enforces the hard spend cap |
 | `web/src/lib/media-gen.ts`, `media-store.ts` | Image/video/moderation providers (mock and Bedrock) and photo/art storage (local disk or S3) |
+| `web/src/lib/jpeg-strip.ts` | Removes EXIF/GPS and trailing payloads from uploaded JPEGs on the server |
+| `docs/RUNBOOK.md` | AWS (SST) deploy, dry run, party-day checklist, rollback |
 | `web/src/lib/sanitize.ts` | Input clamping for config, plan, and player profile |
 | `web/src/lib/gm-ai.ts` | Bedrock case generation with fallback to `sample-case.ts` |
 | `web/src/lib/sample-case.ts` | Built-in sample case ("The Last Toast at Gus Pennywhistle's 70th") |

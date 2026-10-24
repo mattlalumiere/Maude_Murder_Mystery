@@ -3,7 +3,10 @@
 import { createHash } from "node:crypto";
 import { getMediaStore } from "./media-store";
 
-const useBedrock = () => process.env.MEDIA_PROVIDER === "bedrock";
+// Bedrock and Rekognition paths below are legacy (@deprecated): kept working, not extended.
+// New code calls the ImageModel and Moderator ports in ./ai/media.ts.
+type Provider = "mock" | "bedrock";
+const useBedrock = (p?: Provider) => (p ?? process.env.MEDIA_PROVIDER) === "bedrock";
 export const IMAGE_MODEL = process.env.IMAGE_MODEL_ID ?? "amazon.nova-canvas-v1:0";
 export const VIDEO_MODEL = process.env.VIDEO_MODEL_ID ?? "amazon.nova-reel-v1:1";
 
@@ -39,8 +42,8 @@ function mockImage(r: ImageRequest, label = "AI IMAGE (MOCK)"): Generated {
   return { bytes: Buffer.from(svg), mime: "image/svg+xml" };
 }
 
-export async function generateImage(r: ImageRequest): Promise<Generated> {
-  if (!useBedrock()) return mockImage(r);
+export async function generateImage(r: ImageRequest, provider?: Provider): Promise<Generated> {
+  if (!useBedrock(provider)) return mockImage(r);
   const { BedrockRuntimeClient, InvokeModelCommand } = await import("@aws-sdk/client-bedrock-runtime");
   const client = new BedrockRuntimeClient({ region: process.env.AWS_REGION });
   const [width, height] = r.shape === "square" ? [1024, 1024] : [1280, 720];
@@ -109,8 +112,11 @@ export async function pollVideo(jobRef: string, id: string): Promise<{ status: "
 }
 
 // ---------- photo safety ----------
-export async function moderatePhoto(bytes: Buffer): Promise<{ ok: boolean; reason?: string }> {
-  if (!useBedrock()) return { ok: true };
+export async function moderatePhoto(bytes: Buffer, provider?: Provider): Promise<{ ok: boolean; reason?: string }> {
+  if (!useBedrock(provider)) {
+    // Fail closed: in production an unmoderated photo is never stored. Local development stays open.
+    return process.env.NODE_ENV === "production" ? { ok: false, reason: "Photo checks are not available right now, so photos are turned off." } : { ok: true };
+  }
   const r = await import("@aws-sdk/client-rekognition");
   const client = new r.RekognitionClient({ region: process.env.AWS_REGION });
   const out = await client.send(new r.DetectModerationLabelsCommand({ Image: { Bytes: bytes }, MinConfidence: 60 }));

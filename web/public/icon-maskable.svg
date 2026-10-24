@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Maude Murder Mystery">
+  <rect width="512" height="512" fill="#0e0b12"/>
+  <g transform="translate(256 256) scale(0.7) translate(-256 -256)">
+    <circle cx="256" cy="230" r="150" fill="#1a1520" stroke="#76668a" stroke-width="6"/>
+    <path d="M256 70c20 40 54 62 54 104a54 54 0 0 1-108 0c0-42 34-64 54-104z" fill="#e8b04a"/>
+    <path d="M256 120c10 20 26 30 26 52a26 26 0 0 1-52 0c0-22 16-32 26-52z" fill="#fff4cf"/>
+    <rect x="230" y="215" width="52" height="150" rx="8" fill="#f3ead8"/>
+    <circle cx="256" cy="400" r="46" fill="#8c1d26"/>
+    <text x="256" y="420" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="56" fill="#f3ead8">M</text>
+  </g>
+</svg>

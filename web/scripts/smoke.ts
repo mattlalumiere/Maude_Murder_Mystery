@@ -11,6 +11,8 @@ import type { AgeGroup } from "../src/lib/types";
 async function main() {
   const room0 = await createRoom("host1", "swordfish");
   const code = room0.code;
+  assert.equal(room0.gameId.length, 26, "gameId is a 26 char ULID");
+  assert.ok(room0.cellId && room0.regionId, "room records its cell and region");
   const roster: [string, AgeGroup][] = [
     ...Array.from({ length: 10 }, (_, i) => [`Adult${i}`, "adult"] as [string, AgeGroup]),
     ["Maya", "kid"], ["Ollie", "kid"], ["Zane", "teen"], ["Tilly", "teen"], ["Pip", "little"], ["Jo", "little"],

@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { imageCost, SCENE_PHASES, VIDEO_PHASES, videoCost } from "./budget";
+import { activePrices, imageCost, SCENE_PHASES, VIDEO_PHASES, videoCost } from "./budget";
 import type { MediaItem, Phase, Player, Room } from "./types";
 import { PHASE_INFO } from "./types";
 
@@ -21,7 +21,7 @@ export function queueAvatars(room: Room) {
     push(room, {
       kind: "avatar", phase: "cards", playerIds: [p.id], caption: c.name,
       prompt: `${STYLE} Friendly head-and-shoulders portrait of ${c.name}, ${c.tease} ${c.kid ? "A child character, G-rated." : "An adult character."}`,
-      estCostUsd: imageCost(plan.quality),
+      estCostUsd: imageCost(plan.quality, activePrices()),
     });
   }
 }
@@ -58,7 +58,7 @@ export function queuePhaseMedia(room: Room, phase: Phase) {
       const who = pickPlayers(room, phase, 3 + (i % 2));
       push(room, {
         kind: "scene", phase, playerIds: who.map((p) => p.id), caption: `${PHASE_INFO[phase].title}`,
-        prompt: scene(beat[phase] ?? "", who), estCostUsd: imageCost(plan.quality),
+        prompt: scene(beat[phase] ?? "", who), estCostUsd: imageCost(plan.quality, activePrices()),
       });
     }
   }
@@ -68,7 +68,7 @@ export function queuePhaseMedia(room: Room, phase: Phase) {
     push(room, {
       kind: "video", phase, playerIds: who.map((p) => p.id), caption: `${PHASE_INFO[phase].title} (clip)`,
       prompt: scene(beat[phase] ?? "", who).replace(STYLE, "Short animated cartoon clip, family-friendly, gentle camera move,"),
-      estCostUsd: videoCost(),
+      estCostUsd: videoCost(activePrices()),
     });
   }
 }
@@ -80,10 +80,10 @@ export function reconcilePlan(room: Room) {
   const perPhase: Record<string, number> = {};
   for (const m of room.media) {
     if (m.status !== "queued") { if (m.kind === "scene" && m.status !== "skipped") perPhase[m.phase] = (perPhase[m.phase] ?? 0) + 1; continue; }
-    if (m.kind === "avatar") { if (!plan.avatars) skip(m, "Removed from plan"); else m.estCostUsd = imageCost(plan.quality); }
+    if (m.kind === "avatar") { if (!plan.avatars) skip(m, "Removed from plan"); else m.estCostUsd = imageCost(plan.quality, activePrices()); }
     if (m.kind === "scene") {
       perPhase[m.phase] = (perPhase[m.phase] ?? 0) + 1;
-      if (perPhase[m.phase] > plan.scenesPerAct) skip(m, "Removed from plan"); else m.estCostUsd = imageCost(plan.quality);
+      if (perPhase[m.phase] > plan.scenesPerAct) skip(m, "Removed from plan"); else m.estCostUsd = imageCost(plan.quality, activePrices());
     }
     if (m.kind === "video") {
       const vi = (VIDEO_PHASES as readonly string[]).indexOf(m.phase);

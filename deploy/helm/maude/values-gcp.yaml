@@ -1,0 +1,21 @@
+# GKE with Workload Identity. Fill from `tofu output` of deploy/tofu/envs/gcp.
+cell:
+  id: gcp-usc1-0
+  region: us-central1
+config:
+  # GCS through its S3 interoperability endpoint (HMAC keys come from the secret store).
+  S3_ENDPOINT: https://storage.googleapis.com
+  S3_REGION: auto
+  S3_BUCKET: REPLACE_WITH_TOFU_OUTPUT
+  S3_FORCE_PATH_STYLE: "true"
+  AI_BASE_URL: https://ai.internal.example.com/v1
+  AI_MODEL: REPLACE_MODEL
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: maude-gcp-usc1-0-web@my-project.iam.gserviceaccount.com
+ingress:
+  enabled: true
+  className: traefik
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt

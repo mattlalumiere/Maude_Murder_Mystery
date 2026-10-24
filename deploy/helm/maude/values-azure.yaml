@@ -1,0 +1,25 @@
+# AKS with Azure Workload Identity. Fill from `tofu output` of deploy/tofu/envs/azure.
+cell:
+  id: az-weu-0
+  region: westeurope
+config:
+  # The azureblob adapter is spec only. Until it lands, point the S3 adapter at an
+  # S3 compatible gateway (for example MinIO gateway or a storage proxy) in front of Blob.
+  MEDIA_ADAPTER: s3
+  S3_ENDPOINT: https://minio.maude-system.svc.cluster.local:9000
+  S3_REGION: westeurope
+  S3_BUCKET: REPLACE_BUCKET
+  S3_FORCE_PATH_STYLE: "true"
+  AI_BASE_URL: https://ai.internal.example.com/v1
+  AI_MODEL: REPLACE_MODEL
+podLabels:
+  azure.workload.identity/use: "true"
+serviceAccount:
+  annotations:
+    azure.workload.identity/client-id: 00000000-0000-0000-0000-000000000000
+ingress:
+  enabled: true
+  className: traefik
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt

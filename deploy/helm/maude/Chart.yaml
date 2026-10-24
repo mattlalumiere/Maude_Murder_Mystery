@@ -1,0 +1,6 @@
+apiVersion: v2
+name: maude
+description: Murder Mystery Night web app (one cell). Same chart on EKS, AKS, GKE and kind.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

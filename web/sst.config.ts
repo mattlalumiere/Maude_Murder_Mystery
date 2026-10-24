@@ -36,6 +36,11 @@ export default $config({
         MEDIA_PROVIDER: process.env.MEDIA_PROVIDER ?? "bedrock",
         AUTH_SECRET: process.env.AUTH_SECRET ?? "",
         AUTH_TRUST_HOST: "true",
+        ASYNC_START: "true",
+        // CloudFront closes slow origin responses at 30 s by default. Raise that quota to 60 s, or keep this at 25 s so the sample case is used instead of a 504.
+        GENERATION_DEADLINE_MS: process.env.GENERATION_DEADLINE_MS ?? "25000",
+        // Photo likenesses for players under 18 are off unless you set this to "true" (needs a guardian-consent process).
+        ALLOW_MINOR_PHOTOS: process.env.ALLOW_MINOR_PHOTOS ?? "false",
         AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID ?? "",
         AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET ?? "",
         AUTH_APPLE_ID: process.env.AUTH_APPLE_ID ?? "",

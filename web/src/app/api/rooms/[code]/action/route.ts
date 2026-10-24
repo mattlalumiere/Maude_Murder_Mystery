@@ -1,7 +1,8 @@
 import { hostIdFromSession } from "@/auth";
-import { addPlayer, advance, authPlayer, override, purgePhotos, removePhoto, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
+import { getTextModel } from "@/lib/ai/config";
+import { addPlayer, advance, authPlayer, beginGeneration, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
-import { HttpError, mutate } from "@/lib/store";
+import { getStore, HttpError, mutate } from "@/lib/store";
 import type { AgeGroup, Ballot, MediaPlan } from "@/lib/types";
 
 type Body =
@@ -32,7 +33,13 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
     await mutate(code.toUpperCase(), async (room) => {
       if (isHost && hostId !== room.hostId) throw new HttpError(403, "Not the host");
       switch (body.type) {
-        case "start": await startGame(room); break;
+        case "start": {
+          // Serverless (ASYNC_START=true, set by sst.config.ts) splits Start so a slow AI call cannot hit the function timeout:
+          // this request only claims the room and the host tab then calls /generate. Everywhere else Start stays one request.
+          if (process.env.ASYNC_START === "true" && getTextModel()) { beginGeneration(room); out = { generating: true }; }
+          else { await startGame(room); out = { generating: false }; }
+          break;
+        }
         case "advance": advance(room); break;
         case "pause": room.paused = true; break;
         case "resume": room.paused = false; break;
@@ -41,7 +48,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
           out = { playerId: p.id, token: p.token };
           break;
         }
-        case "kick": room.players = room.players.filter((p) => p.id !== body.playerId); break;
+        case "kick": await kickPlayer(room, body.playerId); break;
         case "override":
           try { out = override(room, body.code, body.cmd, !!body.confirm); }
           catch (e) { if (e instanceof HttpError) deferredError = e as HttpError; else throw e; }
@@ -55,6 +62,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
       }
     });
     if (deferredError) throw deferredError;
+    // Retention: once the reveal is reached and no art job still needs the photos, delete them.
+    if (body.type === "advance" || body.type === "override" || body.type === "start") {
+      const cur = await getStore().get(code.toUpperCase());
+      if (cur && photosCanBePurged(cur)) await mutate(code.toUpperCase(), async (room) => { if (photosCanBePurged(room)) await purgePhotos(room); });
+    }
     return json(out);
   });
 }

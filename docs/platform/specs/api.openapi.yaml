@@ -1,0 +1,844 @@
+openapi: 3.1.0
+info:
+  title: Murder Mystery Night platform API
+  version: 0.2.0
+  description: |
+    Target API (W2). Routes marked `x-status: current` exist in `web/src/app/api`; `x-status: new` are implied by CONTRACT.md.
+    Clients only ever receive publicView, playerView or hostView. The `{code}` path segment is the human join code,
+    never the internal gameId.
+
+    Rate limit headers (W10 middleware) appear on every response:
+    `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` (seconds), and `Retry-After` on 429.
+servers:
+  - url: http://localhost:3000
+    description: Local stack
+tags:
+  - name: ops
+  - name: host
+  - name: game
+  - name: player
+  - name: media
+security: []
+paths:
+  /api/healthz:
+    get:
+      x-status: new
+      tags: [ops]
+      summary: Liveness. 200 while the process can serve requests. Does not touch dependencies.
+      operationId: healthz
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /api/readyz:
+    get:
+      x-status: new
+      tags: [ops]
+      summary: Readiness. 200 only if the store (and media store) answer within 1 second. Never reports AI health as not ready.
+      operationId: readyz
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+        "503":
+          description: Not ready (store or media store unreachable)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Readiness" }
+  /api/auth/{nextauth}:
+    parameters:
+      - name: nextauth
+        in: path
+        required: true
+        schema: { type: string }
+        description: Auth.js catch-all (`signin`, `callback/*`, `session`, `signout`, `csrf`).
+    get:
+      x-status: current
+      tags: [host]
+      summary: Auth.js handlers (host sign in). Dev credentials login only when ALLOW_DEV_LOGIN=true and never in production.
+      operationId: authGet
+      responses:
+        "200": { description: Auth.js response }
+    post:
+      x-status: current
+      tags: [host]
+      summary: Auth.js handlers
+      operationId: authPost
+      responses:
+        "200": { description: Auth.js response }
+  /api/rooms:
+    post:
+      x-status: current
+      tags: [host]
+      summary: Create a game (host).
+      operationId: createGame
+      security: [{ hostSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateGameRequest" }
+      responses:
+        "200":
+          description: Game created; share the code.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code]
+                properties:
+                  code: { $ref: "#/components/schemas/JoinCode" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "503": { $ref: "#/components/responses/Unavailable" }
+  /api/directory/{code}:
+    get:
+      x-status: new
+      tags: [game]
+      summary: Directory lookup. Tells a client whether a join code is a live game that is accepting players. Never returns gameId or cell.
+      operationId: lookupCode
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+      responses:
+        "200":
+          description: Code resolves to a live game
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [code, joinable]
+                properties:
+                  code: { $ref: "#/components/schemas/JoinCode" }
+                  joinable:
+                    type: boolean
+                    description: true only in the lobby and below the player quota
+                  partyName: { type: string }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/rooms/{code}:
+    delete:
+      x-status: new
+      tags: [host]
+      summary: Permanently delete a game and every stored object under its tenant prefix (host only). Idempotent.
+      operationId: deleteGame
+      security: [{ hostSession: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+      responses:
+        "204": { description: Deleted (or already gone) }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/rooms/{code}/export:
+    get:
+      x-status: new
+      tags: [host]
+      summary: Export the host's own game as a zip. No raw photos, tokens, override data, and no truth before the Reveal.
+      operationId: exportGame
+      security: [{ hostSession: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+      responses:
+        "200":
+          description: Zip archive
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/rooms/{code}/join:
+    post:
+      x-status: current
+      tags: [player]
+      summary: Join a game in the lobby. Returns the player's bearer token once.
+      operationId: joinGame
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JoinRequest" }
+      responses:
+        "200":
+          description: Joined
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JoinResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Game already started, game full, or name taken (see error.code)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/rooms/{code}/state:
+    get:
+      x-status: current
+      tags: [game]
+      summary: Poll game state (about every 2 seconds). Returns the view for the requested role.
+      operationId: getState
+      description: |
+        `role=screen` (default) returns publicView with no credentials.
+        `role=player` needs `x-player-id` and `x-player-token` and returns playerView.
+        `role=host` needs a host session for this game and returns hostView.
+        If `v` equals the current version the body is `{unchanged:true,version}`.
+        Target: credentials are checked before the version comparison.
+      security:
+        - {}
+        - hostSession: []
+        - playerToken: []
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+        - name: role
+          in: query
+          schema: { type: string, enum: [screen, player, host], default: screen }
+        - name: v
+          in: query
+          description: Last version the client holds
+          schema: { type: integer, minimum: -1, default: -1 }
+        - { $ref: "#/components/parameters/PlayerId" }
+        - { $ref: "#/components/parameters/PlayerToken" }
+      responses:
+        "200":
+          description: A view or an unchanged marker
+          headers:
+            Cache-Control: { schema: { type: string, const: no-store } }
+            RateLimit-Limit: { $ref: "#/components/headers/RateLimit-Limit" }
+            RateLimit-Remaining: { $ref: "#/components/headers/RateLimit-Remaining" }
+            RateLimit-Reset: { $ref: "#/components/headers/RateLimit-Reset" }
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/Unchanged" }
+                  - { $ref: "#/components/schemas/PublicView" }
+                  - { $ref: "#/components/schemas/PlayerView" }
+                  - { $ref: "#/components/schemas/HostView" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/rooms/{code}/action:
+    post:
+      x-status: current
+      tags: [host, player]
+      summary: Perform a game action. Host actions need the host session; player actions need player credentials.
+      operationId: gameAction
+      security:
+        - hostSession: []
+        - playerToken: []
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+        - { $ref: "#/components/parameters/PlayerId" }
+        - { $ref: "#/components/parameters/PlayerToken" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ActionRequest" }
+      responses:
+        "200":
+          description: Action applied. Body depends on the action.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - { $ref: "#/components/schemas/Ok" }
+                  - { $ref: "#/components/schemas/JoinResponse" }
+                  - { $ref: "#/components/schemas/OverrideResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Wrong phase, paused, or version conflict after retries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429":
+          description: Rate limited, or override locked (error.code OVERRIDE_LOCKED)
+          headers:
+            Retry-After: { $ref: "#/components/headers/Retry-After" }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+  /api/rooms/{code}/photo:
+    post:
+      x-status: current
+      tags: [player]
+      summary: Upload the caller's own consented photo (JPEG, under 2 MB, lobby or cards phase only). Moderated before storage.
+      operationId: uploadPhoto
+      security: [{ playerToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+        - { $ref: "#/components/parameters/PlayerId" }
+        - { $ref: "#/components/parameters/PlayerToken" }
+        - name: x-consent
+          in: header
+          required: true
+          schema: { type: string, enum: [self, guardian] }
+          description: Players under 18 must send `guardian`.
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema: { type: string, format: binary }
+      responses:
+        "200": { description: Stored, content: { application/json: { schema: { $ref: "#/components/schemas/Ok" } } } }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { description: Photos only before the party starts, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "413": { description: Photo too large or too small, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "415": { description: Not a JPEG, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: Moderation refused, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    get:
+      x-status: current
+      tags: [player]
+      summary: Preview the caller's own photo. Never returns another player's photo.
+      operationId: getOwnPhoto
+      security: [{ playerToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+        - { $ref: "#/components/parameters/PlayerId" }
+        - { $ref: "#/components/parameters/PlayerToken" }
+      responses:
+        "200":
+          description: The JPEG
+          headers:
+            Cache-Control: { schema: { type: string, const: "private, no-store" } }
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/rooms/{code}/media/run:
+    post:
+      x-status: current
+      tags: [media]
+      summary: One tick of the media worker. Host or any joined player. Spend is capped server side through claim().
+      operationId: runMediaTick
+      security:
+        - hostSession: []
+        - playerToken: []
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+        - { $ref: "#/components/parameters/PlayerId" }
+        - { $ref: "#/components/parameters/PlayerToken" }
+      responses:
+        "200":
+          description: Tick result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MediaTick" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/rooms/{code}/media/{id}:
+    get:
+      x-status: current
+      tags: [media]
+      summary: Serve a generated image or clip belonging to this game. Raw player photos are never served here.
+      operationId: getMedia
+      parameters:
+        - { $ref: "#/components/parameters/Code" }
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Generated art
+          headers:
+            Cache-Control: { schema: { type: string } }
+            X-Content-Type-Options: { schema: { type: string, const: nosniff } }
+          content:
+            image/png: { schema: { type: string, format: binary } }
+            image/jpeg: { schema: { type: string, format: binary } }
+            video/mp4: { schema: { type: string, format: binary } }
+        "404": { $ref: "#/components/responses/NotFound" }
+components:
+  securitySchemes:
+    hostSession:
+      type: apiKey
+      in: cookie
+      name: authjs.session-token
+      description: Auth.js session cookie (cookie name is __Secure-authjs.session-token over HTTPS). Must belong to the game's host.
+    playerToken:
+      type: apiKey
+      in: header
+      name: x-player-token
+      description: Per-player bearer token, always sent together with `x-player-id`. Returned once by join.
+  parameters:
+    Code:
+      name: code
+      in: path
+      required: true
+      description: Join code, case-insensitive on input.
+      schema: { $ref: "#/components/schemas/JoinCode" }
+    PlayerId:
+      name: x-player-id
+      in: header
+      schema: { type: string }
+    PlayerToken:
+      name: x-player-token
+      in: header
+      schema: { type: string }
+  headers:
+    RateLimit-Limit: { schema: { type: integer }, description: Requests allowed in the window }
+    RateLimit-Remaining: { schema: { type: integer }, description: Requests left in the window }
+    RateLimit-Reset: { schema: { type: integer }, description: Seconds until the window resets }
+    Retry-After: { schema: { type: integer }, description: Seconds to wait before retrying }
+  responses:
+    BadRequest:
+      description: Invalid input
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unauthorized:
+      description: Missing or invalid credentials
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Forbidden:
+      description: Authenticated but not allowed (for example not the host)
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    NotFound:
+      description: Unknown, deleted, expired, or another tenant's resource (indistinguishable by design)
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    RateLimited:
+      description: Too many requests
+      headers:
+        Retry-After: { $ref: "#/components/headers/Retry-After" }
+        RateLimit-Limit: { $ref: "#/components/headers/RateLimit-Limit" }
+        RateLimit-Remaining: { $ref: "#/components/headers/RateLimit-Remaining" }
+        RateLimit-Reset: { $ref: "#/components/headers/RateLimit-Reset" }
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+    Unavailable:
+      description: Dependency unavailable or capacity exhausted
+      content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } }
+  schemas:
+    JoinCode:
+      type: string
+      pattern: "^[A-HJKMNP-Za-hjkmnp-z]{4,6}$"
+      description: 4 to 6 letters from ABCDEFGHJKMNPQRSTUVWXYZ.
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine code.
+              enum: [BAD_REQUEST, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, GAME_STARTED, GAME_FULL, NAME_TAKEN, WRONG_PHASE, PAUSED, BALLOTS_CLOSED, INVALID_BALLOT, OVERRIDE_DENIED, OVERRIDE_LOCKED, CONSENT_REQUIRED, PHOTO_REJECTED, PAYLOAD_TOO_LARGE, UNSUPPORTED_MEDIA, QUOTA_STORAGE, QUOTA_PLAYERS, QUOTA_HOST_GAMES, RATE_LIMITED, BUSY, UNAVAILABLE, INTERNAL]
+            message:
+              type: string
+              description: Human readable, safe to show. Never contains secrets, tokens, codes or truth.
+            requestId: { type: string }
+      description: |
+        Target shape. Today routes return `{ "error": "<message>" }` (a string); clients must accept both until the migration lands.
+    Ok:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean, const: true }
+    Unchanged:
+      type: object
+      required: [unchanged, version]
+      properties:
+        unchanged: { type: boolean, const: true }
+        version: { type: integer }
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, const: ok }
+        cell: { type: string }
+        region: { type: string }
+    Readiness:
+      type: object
+      required: [status, checks]
+      properties:
+        status: { type: string, enum: [ready, not_ready] }
+        checks:
+          type: object
+          properties:
+            store: { type: string, enum: [ok, fail] }
+            media: { type: string, enum: [ok, fail] }
+            ai: { type: string, enum: [ok, degraded, off], description: Informational only; never makes the pod not ready. }
+    CreateGameRequest:
+      type: object
+      required: [overrideCode]
+      properties:
+        overrideCode: { type: string, minLength: 4, description: "Host Override Code. Stored as salted scrypt, never returned." }
+        config: { $ref: "#/components/schemas/GameConfig" }
+        capUsd: { type: number, minimum: 0, maximum: 500 }
+        plan: { $ref: "#/components/schemas/MediaPlan" }
+    GameConfig:
+      type: object
+      properties:
+        name: { type: string, maxLength: 60 }
+        expected:
+          type: object
+          properties:
+            adults: { type: integer, minimum: 2, maximum: 40 }
+            kids: { type: integer, minimum: 0, maximum: 30 }
+            toddlers: { type: integer, minimum: 0, maximum: 10 }
+        lengthMin: { type: integer, enum: [90, 120, 150] }
+        spice: { type: string, enum: [mild, medium, spicy] }
+        drinking: { type: string, enum: [adults, none] }
+        themePrompt: { type: string, maxLength: 400 }
+        settingPrompt: { type: string, maxLength: 400 }
+        tonePrompt: { type: string, maxLength: 300 }
+        mustInclude: { type: string, maxLength: 400 }
+        avoid: { type: string, maxLength: 400 }
+        allowPlayerBackstory: { type: boolean }
+    MediaPlan:
+      type: object
+      properties:
+        avatars: { type: boolean }
+        scenesPerAct: { type: integer, minimum: 0, maximum: 3 }
+        videoClips: { type: integer, minimum: 0, maximum: 4 }
+        quality: { type: string, enum: [standard, premium] }
+        paused: { type: boolean }
+    AgeGroup:
+      type: string
+      enum: [little, kid, teen, adult]
+    PlayerProfileInput:
+      type: object
+      properties:
+        backstoryMode: { type: string, enum: [gm, hint, own] }
+        backstory: { type: string, maxLength: 600 }
+    JoinRequest:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 24 }
+        ageGroup: { $ref: "#/components/schemas/AgeGroup" }
+        wantsVictim: { type: boolean }
+        profile: { $ref: "#/components/schemas/PlayerProfileInput" }
+    JoinResponse:
+      type: object
+      required: [playerId, token]
+      properties:
+        playerId: { type: string }
+        token: { type: string, description: Bearer secret. Shown once. Never appears in any view. }
+    Ballot:
+      type: object
+      required: [killerId, methodId, motiveId]
+      properties:
+        killerId: { type: string }
+        methodId: { type: string }
+        motiveId: { type: string }
+    ActionRequest:
+      description: Discriminated by `type`. Host actions are marked.
+      oneOf:
+        - { $ref: "#/components/schemas/ActStart" }
+        - { $ref: "#/components/schemas/ActAdvance" }
+        - { $ref: "#/components/schemas/ActPauseResume" }
+        - { $ref: "#/components/schemas/ActAddPlayer" }
+        - { $ref: "#/components/schemas/ActKick" }
+        - { $ref: "#/components/schemas/ActOverride" }
+        - { $ref: "#/components/schemas/ActSetPlan" }
+        - { $ref: "#/components/schemas/ActPurgePhotos" }
+        - { $ref: "#/components/schemas/ActRemovePhoto" }
+        - { $ref: "#/components/schemas/ActReady" }
+        - { $ref: "#/components/schemas/ActBallot" }
+      discriminator:
+        propertyName: type
+    ActStart:
+      type: object
+      required: [type]
+      properties: { type: { const: start, description: "host. Needs 4+ players, 2+ adults. Generates the case." } }
+    ActAdvance:
+      type: object
+      required: [type]
+      properties: { type: { const: advance, description: "host. Refused while paused." } }
+    ActPauseResume:
+      type: object
+      required: [type]
+      properties: { type: { type: string, enum: [pause, resume], description: host } }
+    ActAddPlayer:
+      type: object
+      required: [type, name, ageGroup]
+      properties:
+        type: { const: addPlayer, description: "host. Adds a player without a device." }
+        name: { type: string }
+        ageGroup: { $ref: "#/components/schemas/AgeGroup" }
+    ActKick:
+      type: object
+      required: [type, playerId]
+      properties:
+        type: { const: kick, description: host }
+        playerId: { type: string }
+    ActOverride:
+      type: object
+      required: [type, code, cmd]
+      properties:
+        type: { const: override, description: host }
+        code: { type: string, writeOnly: true }
+        cmd: { type: string, enum: [NUDGE, ADVANCED, ACCELERATE, FINAL, FINAL_REVEAL] }
+        confirm: { type: boolean, description: Required on the second call for FINAL and FINAL_REVEAL. }
+    ActSetPlan:
+      type: object
+      required: [type]
+      properties:
+        type: { const: setPlan, description: host }
+        plan: { $ref: "#/components/schemas/MediaPlan" }
+        capUsd: { type: number }
+    ActPurgePhotos:
+      type: object
+      required: [type]
+      properties: { type: { const: purgePhotos, description: host } }
+    ActRemovePhoto:
+      type: object
+      required: [type]
+      properties: { type: { const: removePhoto, description: "player. Deletes the caller's photo." } }
+    ActReady:
+      type: object
+      required: [type]
+      properties: { type: { const: ready, description: player } }
+    ActBallot:
+      type: object
+      required: [type, ballot]
+      properties:
+        type: { const: ballot, description: "player. Only while ballots are open." }
+        ballot: { $ref: "#/components/schemas/Ballot" }
+    OverrideResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        needsConfirm: { type: boolean }
+    MediaTick:
+      type: object
+      description: Result of one worker tick (shape owned by W5; at least the fields below).
+      properties:
+        ran: { type: boolean }
+        note: { type: string }
+    MediaRef:
+      type: object
+      required: [id, kind, phase, caption]
+      properties:
+        id: { type: string }
+        kind: { type: string, enum: [avatar, scene, video] }
+        phase: { $ref: "#/components/schemas/Phase" }
+        caption: { type: string }
+        mime: { type: string }
+    Phase:
+      type: string
+      enum: [lobby, cards, act1, death, act2, intermission, act3, act4, reveal]
+    RevealBlock:
+      type: object
+      description: Present only when phase is reveal.
+      required: [killer, method, motive, story, scores, awards]
+      properties:
+        killer: { type: string }
+        method: { type: string }
+        motive: { type: string }
+        story: { type: string }
+        scores:
+          type: array
+          items:
+            type: object
+            required: [playerId, name, points, detail]
+            properties:
+              playerId: { type: string }
+              name: { type: string }
+              points: { type: integer }
+              detail: { type: string }
+        awards:
+          type: array
+          items:
+            type: object
+            required: [award, to]
+            properties:
+              award: { type: string }
+              to: { type: string }
+    PublicView:
+      type: object
+      additionalProperties: false
+      description: |
+        Visible to anyone with the code (big screen). Fields that must NEVER appear in any view before the Reveal
+        (enforced by the security test project, extend it when adding a view field):
+        killerId, victimId, truth, methodId (as truth), motiveId (as truth), nudges, advanced, result, reveal,
+        card (any player's), secret, alibi, knows, goal, special, characterId (of any player), token,
+        overrideHash, overrideSalt, failedOverrides, photoKey, key (media storage key), jobRef, lockUntil, gameId,
+        tenant key prefixes, the unreleased clues and the twist text, ballot contents of other players.
+        After the Reveal only the `reveal` block adds truth; the raw case file is never sent.
+      required: [code, version, phase, phaseTitle, clock, paused, partyName, media, lobbyNames, roster, clues, ballotsOpen, ballotsIn, totalPlayers]
+      properties:
+        code: { $ref: "#/components/schemas/JoinCode" }
+        version: { type: integer }
+        phase: { $ref: "#/components/schemas/Phase" }
+        phaseTitle: { type: string }
+        clock: { type: string }
+        paused: { type: boolean }
+        title: { type: string }
+        setting: { type: string }
+        partyName: { type: string }
+        narration: { type: string, description: Public narration for the phase only. }
+        media:
+          type: array
+          items: { $ref: "#/components/schemas/MediaRef" }
+        lobbyNames:
+          type: array
+          items: { type: string }
+        roster:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [playerName, characterName, house, tease, kid]
+            properties:
+              playerName: { type: string }
+              characterName: { type: string }
+              house: { type: string }
+              tease: { type: string }
+              kid: { type: boolean }
+              avatarId: { type: string }
+        clues:
+          type: array
+          description: Released clues only (round 1 from act2, round 2 and id `twist` from act3).
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, round, text]
+            properties:
+              id: { type: string }
+              round: { type: integer, enum: [1, 2] }
+              text: { type: string }
+        ballotsOpen: { type: boolean }
+        ballotOptions:
+          type: object
+          description: Only while ballots are open. Suspect list excludes the victim and kids.
+          properties:
+            suspects:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+            methods:
+              type: array
+              items: { $ref: "#/components/schemas/Option" }
+            motives:
+              type: array
+              items: { $ref: "#/components/schemas/Option" }
+        ballotsIn: { type: integer }
+        totalPlayers: { type: integer }
+        reveal: { $ref: "#/components/schemas/RevealBlock" }
+    Option:
+      type: object
+      required: [id, text]
+      properties:
+        id: { type: string }
+        text: { type: string }
+    PlayerView:
+      description: publicView plus `me`. Contains only the caller's own card and ballot.
+      allOf:
+        - { $ref: "#/components/schemas/PublicView" }
+        - type: object
+          required: [me]
+          properties:
+            me:
+              type: object
+              required: [id, name, ageGroup, ready, profile]
+              properties:
+                id: { type: string }
+                name: { type: string }
+                ageGroup: { $ref: "#/components/schemas/AgeGroup" }
+                ready: { type: boolean }
+                ballot: { $ref: "#/components/schemas/Ballot" }
+                avatarId: { type: string }
+                profile:
+                  type: object
+                  required: [backstoryMode, backstory, consent, hasPhoto]
+                  properties:
+                    backstoryMode: { type: string, enum: [gm, hint, own] }
+                    backstory: { type: string }
+                    consent: { type: string, enum: [none, self, guardian] }
+                    hasPhoto: { type: boolean }
+                character:
+                  type: object
+                  description: Only the caller's own character, only after start.
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    house: { type: string }
+                    tease: { type: string }
+                    kid: { type: boolean }
+                    role: { type: string, enum: [suspect, witness, victim, mascot, informant] }
+                    card:
+                      type: object
+                      properties:
+                        story: { type: string }
+                        secret: { type: string }
+                        alibi: { type: string }
+                        knows: { type: array, items: { type: string } }
+                        goal: { type: string }
+                        special: { type: string }
+                        extra: { type: string }
+    HostView:
+      description: |
+        publicView plus run-the-night data. Still never contains the case file, any card, any ballot content,
+        tokens, override salt/hash, photo keys. The solution reaches the host only via a valid override command.
+      allOf:
+        - { $ref: "#/components/schemas/PublicView" }
+        - type: object
+          required: [overrideUsed, lockedUntil, config, budget, jobs, runSheet, players]
+          properties:
+            overrideUsed: { type: boolean }
+            lockedUntil: { type: integer, description: "Epoch ms; 0 or past means unlocked." }
+            config: { $ref: "#/components/schemas/GameConfig" }
+            caseSource: { type: string, enum: [sample, ai, bedrock], description: "Shows whether the sample case is in use. `bedrock` is legacy; target value is `ai`." }
+            budget:
+              type: object
+              properties:
+                capUsd: { type: number }
+                spentUsd: { type: number }
+                reservedUsd: { type: number }
+                plan: { $ref: "#/components/schemas/MediaPlan" }
+            jobs:
+              type: array
+              maxItems: 60
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  kind: { type: string }
+                  phase: { $ref: "#/components/schemas/Phase" }
+                  status: { type: string, enum: [queued, running, polling, done, failed, skipped] }
+                  note: { type: string }
+                  est: { type: number }
+                  caption: { type: string }
+            runSheet:
+              type: array
+              items:
+                type: object
+                properties:
+                  phase: { $ref: "#/components/schemas/Phase" }
+                  title: { type: string }
+                  clock: { type: string }
+            players:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  name: { type: string }
+                  ageGroup: { $ref: "#/components/schemas/AgeGroup" }
+                  ready: { type: boolean }
+                  hasDevice: { type: boolean }
+                  ballot: { type: boolean, description: Submitted yes or no only. }
+                  hasPhoto: { type: boolean }
+                  backstory: { type: string, enum: [gm, hint, own] }
+                  characterName: { type: string }

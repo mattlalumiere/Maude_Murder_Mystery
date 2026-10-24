@@ -1,0 +1,19 @@
+# EKS. Fill account and role names from `tofu output` of deploy/tofu/envs/aws.
+cell:
+  id: aws-use1-0
+  region: us-east-1
+config:
+  S3_REGION: us-east-1
+  S3_BUCKET: REPLACE_WITH_TOFU_OUTPUT
+  S3_FORCE_PATH_STYLE: "false"
+  AI_BASE_URL: https://ai.internal.example.com/v1
+  AI_MODEL: REPLACE_MODEL
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::000000000000:role/maude-aws-use1-0-web
+ingress:
+  enabled: true
+  className: traefik
+  tls:
+    enabled: true
+    clusterIssuer: letsencrypt

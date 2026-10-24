@@ -1,11 +1,14 @@
 "use client";
 import { useState } from "react";
+import { copyText } from "@/lib/client";
+import { Button } from "@/components/kit";
 
-export function CopyButton({ text, label = "Copy link" }: { text: string; label?: string }) {
+export function CopyButton({ text, label = "Copy link", testId = "copy-link" }: { text: string; label?: string; testId?: string }) {
   const [done, setDone] = useState(false);
   return (
-    <button className="ghost" onClick={async () => { try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500); } catch {} }}>
+    <Button variant="secondary" data-testid={testId} onClick={async () => { if (await copyText(text)) { setDone(true); setTimeout(() => setDone(false), 1500); } }}>
       {done ? "Copied" : label}
-    </button>
+      <span className="sr-only" role="status">{done ? "Link copied" : ""}</span>
+    </Button>
   );
 }

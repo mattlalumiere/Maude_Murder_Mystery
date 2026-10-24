@@ -1,5 +1,7 @@
-import { generateImage, loadPhoto, pollVideo, startVideo } from "./media-gen";
+import { getImageModel } from "./ai/media";
+import { loadPhoto, pollVideo, startVideo } from "./media-gen";
 import { getMediaStore } from "./media-store";
+import { photosCanBePurged, purgePhotos } from "./engine";
 import { getStore, mutate } from "./store";
 import type { MediaItem, Room } from "./types";
 
@@ -9,7 +11,7 @@ const POLL_EVERY_MS = 8_000;
 const ext = (mime: string) => (mime === "image/png" ? "png" : mime === "image/svg+xml" ? "svg" : mime === "video/mp4" ? "mp4" : "bin");
 
 /** Claims the next job, enforcing the hard budget cap. Runs inside mutate(). */
-function claim(room: Room): MediaItem | null {
+export function claim(room: Room): MediaItem | null {
   const now = Date.now();
   const b = room.budget;
   if (b.plan.paused) return null;
@@ -57,7 +59,7 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
         out = v.done ? { kind: "done", bytes: v.done.bytes, mime: v.done.mime } : { kind: "polling", jobRef: v.jobRef };
       }
     } else {
-      const g = await generateImage({
+      const g = await getImageModel().generate({
         prompt: job.prompt, caption: job.caption, refs, quality: room.budget.plan.quality,
         shape: job.kind === "avatar" ? "square" : "wide",
       });
@@ -73,7 +75,7 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
     await getMediaStore().put(key, out.bytes, out.mime);
   }
 
-  const { result } = await mutate(code, (room) => {
+  const { result, room: after } = await mutate(code, (room) => {
     const m = room.media.find((x) => x.id === job.id)!;
     const b = room.budget;
     if (out.kind === "done") {
@@ -88,5 +90,7 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
     }
     return { id: m.id, kind: m.kind, status: m.status, note: m.note };
   });
+  // Retention: after the reveal, delete player photos as soon as no job needs them as references.
+  if (photosCanBePurged(after)) await mutate(code, async (r) => { if (photosCanBePurged(r)) await purgePhotos(r); });
   return { ran: true, item: result };
 }

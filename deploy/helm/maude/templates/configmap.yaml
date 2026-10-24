@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "maude.fullname" . }}
+  labels:
+    {{- include "maude.labels" . | nindent 4 }}
+data:
+  CELL_ID: {{ .Values.cell.id | quote }}
+  REGION_ID: {{ .Values.cell.region | quote }}
+  {{- range $k, $v := .Values.config }}
+  {{- if ne (toString $v) "" }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+  {{- end }}

@@ -1,5 +1,7 @@
 "use client";
 import { useState } from "react";
+import { Card, Field } from "@/components/kit";
+import { uploadPhotoBlob, type Creds } from "@/lib/client";
 
 /** Downsizes a photo to a JPEG no larger than `max` pixels on its long side. */
 export async function resizeToJpeg(file: File, max = 768): Promise<Blob> {
@@ -11,13 +13,7 @@ export async function resizeToJpeg(file: File, max = 768): Promise<Blob> {
   return new Promise((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error("Could not read photo"))), "image/jpeg", 0.85));
 }
 
-export async function uploadPhoto(code: string, creds: { pid: string; tok: string }, blob: Blob, consent: "self" | "guardian") {
-  const r = await fetch(`/api/rooms/${code}/photo`, {
-    method: "POST", body: blob,
-    headers: { "x-player-id": creds.pid, "x-player-token": creds.tok, "x-consent": consent, "content-type": "image/jpeg" },
-  });
-  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? "Upload failed");
-}
+export const uploadPhoto = (code: string, creds: Creds, blob: Blob, consent: "self" | "guardian") => uploadPhotoBlob(code, creds, blob, consent);
 
 /** Photo picker with consent. Used while joining (deferred upload) and later from the player page (immediate upload). */
 export function PhotoPicker({
@@ -40,23 +36,26 @@ export function PhotoPicker({
   }
 
   return (
-    <div className="card">
-      <label htmlFor="photo">Optional: a photo to use for your cartoon look-alike</label>
-      <input id="photo" type="file" accept="image/*" capture="user" disabled={disabled} onChange={(e) => pick(e.target.files?.[0])} />
+    <Card title="A cartoon look-alike (optional)" data-testid="photo-picker">
+      <Field label="Choose or take a photo" hint="Skip it and the GM draws you without a likeness.">
+        <input type="file" accept="image/*" capture="user" disabled={disabled} data-testid="photo-input" onChange={(e) => pick(e.target.files?.[0])} />
+      </Field>
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
-        <p><img src={preview} alt="Your photo preview" width={120} height={120} style={{ objectFit: "cover", borderRadius: 12 }} /></p>
+        <p><img src={preview} alt="Your photo preview" width={120} height={120} style={{ objectFit: "cover", borderRadius: "var(--radius)" }} /></p>
       )}
-      {err && <p className="err">{err}</p>}
-      <label style={{ color: "var(--fg)" }}>
-        <input type="checkbox" checked={agreed} onChange={(e) => { setAgreed(e.target.checked); onChange({ blob, consent: e.target.checked ? consent : null }); }} />
-        {isAdult
-          ? "I agree to my photo being used to create cartoon images of my character in this game."
-          : "I am this player's parent or guardian and I agree to their photo being used to create cartoon images of their character in this game."}
+      {err && <p className="sc-error" role="alert">{err}</p>}
+      <label className="sc-check">
+        <input type="checkbox" checked={agreed} data-testid="photo-consent" onChange={(e) => { setAgreed(e.target.checked); onChange({ blob, consent: e.target.checked ? consent : null }); }} />
+        <span>
+          {isAdult
+            ? "I agree to my photo being used to create cartoon images of my character in this game."
+            : "I am this player's parent or guardian and I agree to their photo being used to create cartoon images of their character in this game."}
+        </span>
       </label>
-      <p className="muted" style={{ fontSize: ".85rem" }}>
-        Your photo is used only to draw your character in this game, is never shown to other players, and is deleted within 24 hours (the host can delete it sooner). Skip it and the GM draws you without a likeness.
+      <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
+        Your photo is used only to draw your character, is never shown to other players, and is deleted within 24 hours (the host can delete it sooner).
       </p>
-    </div>
+    </Card>
   );
 }
