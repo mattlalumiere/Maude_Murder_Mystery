@@ -66,7 +66,7 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
       )}
 
       {!inLobby && !cardsPhase && state.bots.length > 0 && (
-        <TalkToGuests code={code} creds={creds} bots={state.bots} log={state.botLog} adult={me.ageGroup === "adult"} voiceReplies={state.botConfig.voice} />
+        <TalkToGuests code={code} creds={creds} bots={state.bots} log={state.botLog} adult={me.ageGroup === "adult"} voiceReplies={state.botConfig.voice} stt={state.stt} />
       )}
 
       {state.reveal && state.storyId && <StoryVote code={code} storyId={state.storyId} creds={creds} />}

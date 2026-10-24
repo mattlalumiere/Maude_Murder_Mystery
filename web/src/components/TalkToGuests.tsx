@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Media";
 import { useBotVoice, VoiceToggle } from "@/components/BotVoice";
 import { Button, Card, ErrorNote } from "@/components/kit";
-import { chatWithBot, friendlyError, type BotLineView, type BotView, type Creds } from "@/lib/client";
+import { chatWithBot, credHeaders, friendlyError, type BotLineView, type BotView, type Creds } from "@/lib/client";
 
 type SR = { start: () => void; stop: () => void; lang: string; interimResults: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null };
 const getSR = (): (new () => SR) | null => {
@@ -13,8 +13,8 @@ const getSR = (): (new () => SR) | null => {
 };
 
 /** Phone panel: chat or talk with the AI guests. Voice input is for grown-ups only (browsers send speech to their maker's service). */
-export function TalkToGuests({ code, creds, bots, log, adult, voiceReplies }: {
-  code: string; creds: Creds; bots: BotView[]; log: BotLineView[]; adult: boolean; voiceReplies: boolean;
+export function TalkToGuests({ code, creds, bots, log, adult, voiceReplies, stt = "browser" }: {
+  code: string; creds: Creds; bots: BotView[]; log: BotLineView[]; adult: boolean; voiceReplies: boolean; stt?: "server" | "browser";
 }) {
   const [botId, setBotId] = useState(bots[0]?.id ?? "");
   const [text, setText] = useState("");
@@ -24,7 +24,9 @@ export function TalkToGuests({ code, creds, bots, log, adult, voiceReplies }: {
   const [mine, setMine] = useState<BotLineView[]>([]);
   const voice = useBotVoice(code);
   const sr = useRef<SR | null>(null);
-  const SRClass = adult ? getSR() : null;
+  const SRClass = adult && stt === "browser" ? getSR() : null;
+  const rec = useRef<MediaRecorder | null>(null);
+  const canRecord = adult && stt === "server" && typeof MediaRecorder !== "undefined";
 
   useEffect(() => { if (!botId && bots[0]) setBotId(bots[0].id); }, [bots, botId]);
   const thread = log.filter((l) => l.botId === botId && (l.kind === "chatter" || l.to === undefined || true)).slice(-8);
@@ -54,6 +56,31 @@ export function TalkToGuests({ code, creds, bots, log, adult, voiceReplies }: {
     rec.start();
   }
 
+  // Local speech-to-text: record a few seconds, send it to the host's own computer, and ask the guest with the words.
+  async function record() {
+    if (rec.current && rec.current.state === "recording") { rec.current.stop(); return; }
+    setErr("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+      mr.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+      mr.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        setListening(false);
+        const blob = new Blob(chunks, { type: mr.mimeType || "audio/webm" });
+        try {
+          const r = await fetch(`/api/rooms/${code}/bots/transcribe`, { method: "POST", body: blob, headers: { ...credHeaders(creds), "content-type": (mr.mimeType || "audio/webm").split(";")[0] } });
+          const j = (await r.json().catch(() => ({}))) as { text?: string; error?: string };
+          if (!r.ok || !j.text) throw new Error(j.error ?? "Could not hear you");
+          void send(j.text);
+        } catch (e) { setErr(friendlyError((e as Error).message)); }
+      };
+      rec.current = mr; setListening(true); mr.start();
+      setTimeout(() => { if (mr.state === "recording") mr.stop(); }, 8000);
+    } catch { setErr("Microphone access was blocked. Allow it in your browser settings, or type instead."); }
+  }
+
   if (!bots.length) return null;
   return (
     <Card title="Talk to the guests" data-testid="talk-to-guests" style={{ marginTop: "var(--space-3)" }}>
@@ -73,12 +100,13 @@ export function TalkToGuests({ code, creds, bots, log, adult, voiceReplies }: {
         <input value={text} maxLength={300} placeholder="Ask a question..." aria-label="Message to the guest" data-testid="bot-input" onChange={(e) => setText(e.target.value)} style={{ flex: 1, minWidth: 160 }} />
         <Button type="submit" disabled={busy || !text.trim()} data-testid="bot-send">Ask</Button>
         {SRClass && <Button type="button" variant="secondary" disabled={busy || listening} onClick={listen} data-testid="bot-mic">{listening ? "Listening..." : "Speak"}</Button>}
+        {canRecord && <Button type="button" variant="secondary" disabled={busy} onClick={record} data-testid="bot-mic-local">{listening ? "Stop" : "Speak"}</Button>}
       </form>
       <div className="sc-actions" style={{ marginTop: "var(--space-2)" }}>
         <VoiceToggle enabled={voice.enabled} onToggle={voice.toggle} label="Voices" />
       </div>
       <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
-        These guests are AI characters. {SRClass ? "The Speak button uses your browser's speech service, which may send your voice to its maker. " : ""}Keep it friendly.
+        These guests are AI characters. {SRClass ? "The Speak button uses your browser's speech service, which may send your voice to its maker. " : ""}{canRecord ? "The Speak button records a few seconds and sends it only to the host's own computer. " : ""}Keep it friendly.
       </p>
     </Card>
   );

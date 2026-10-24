@@ -2,7 +2,7 @@
 import type { BotLineView, BotView } from "@/lib/client";
 import type { BudgetState, CharacterCard, GameConfig } from "@/lib/types";
 
-export type BotCommon = { storyId?: string | null; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
+export type BotCommon = { storyId?: string | null; stt?: "server" | "browser"; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
 
 export type MediaItemView = { id: string; kind: string; phase: string; caption: string; mime?: string };
 
@@ -14,7 +14,7 @@ export type HostState = BotCommon & {
   players: { id: string; name: string; isBot?: boolean; ageGroup: string; ready: boolean; hasDevice: boolean; ballot: boolean; characterName?: string; hasPhoto: boolean; backstory: string }[];
   clues: { id: string; text: string }[];
   reveal?: { killer?: string; scores: { name: string; points: number }[] };
-  generating?: number | null; starting?: boolean; drinking?: "adults" | "none";
+  localAi?: boolean; aiMode?: string; generating?: number | null; starting?: boolean; drinking?: "adults" | "none";
   config: GameConfig; caseSource?: "sample" | "bedrock"; aiDegraded?: boolean; budget: BudgetState;
   jobs: { id: string; kind: string; phase: string; status: string; note?: string; est: number; caption: string }[];
 };

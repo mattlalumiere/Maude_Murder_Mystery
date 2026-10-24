@@ -1,5 +1,6 @@
 import { hostIdFromSession } from "@/auth";
 import { finishGeneration, generationDeadlineMs, generationRoster } from "@/lib/engine";
+import { caseOptionsFor } from "@/lib/ai/route";
 import { generateCase } from "@/lib/gm-ai";
 import { handle, json } from "@/lib/http";
 import { getStore, HttpError, mutate } from "@/lib/store";
@@ -23,7 +24,7 @@ export async function POST(_req: Request, ctx: { params: Promise<{ code: string 
     const sample = () => generateCase(roster, room.config, { model: null });
     let timer: ReturnType<typeof setTimeout> | undefined;
     const gen = await Promise.race([
-      generateCase(roster, room.config, { gameId: code, timeoutMs: Math.max(3_000, deadline - 5_000) }).catch(() => sample()),
+      generateCase(roster, room.config, { gameId: code, ...caseOptionsFor(room), timeoutMs: Math.max(3_000, deadline - 5_000) }).catch(() => sample()),
       new Promise<Awaited<ReturnType<typeof generateCase>>>((resolve) => { timer = setTimeout(() => sample().then(resolve), deadline); }),
     ]);
     if (timer) clearTimeout(timer);

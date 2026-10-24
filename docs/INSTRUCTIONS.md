@@ -131,3 +131,12 @@ After a game (or any time after the cards are dealt) the host console has **Save
 - The solution is **sealed** on the server. Nobody who replays a story, including the host who starts it, can read the answer in the app. Your own copy follows the same rule.
 - To play someone else's story, open its page, press **Host a game with this story**, and carry on as usual. Theme prompts are ignored because the story is already written.
 - Votes: one per account, and one per player of a replayed game. Three reports hide a story from the gallery. Owners can delete their stories from the story page.
+
+## Local AI services (no cloud needed)
+
+For testing or private play you can run the AI on your own computer: `make local-ai-up`, set `LOCAL_AI_MCP_URL` in `web/.env.local`, and choose **Local services on my own computer** in step 3 of the setup wizard. Then:
+
+- AI guests talk and speak using local voices. Grown-ups can tap **Speak**: the recording goes only to your computer, not to a browser vendor.
+- An uploaded photo is redrawn by the local diffusion model into the character, using a prompt written for that character and the story. Clips are short slideshow videos with the scene narration.
+- Nothing is charged to the budget. Local models can be slow on a laptop, so pictures arrive when they are ready and the game never waits for them.
+- Details and hardware notes: `services/local-ai/README.md`.

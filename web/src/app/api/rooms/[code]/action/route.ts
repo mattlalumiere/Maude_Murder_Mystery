@@ -1,5 +1,5 @@
 import { hostIdFromSession } from "@/auth";
-import { getTextModel } from "@/lib/ai/config";
+import { textModelFor } from "@/lib/ai/route";
 import { addBots, addPlayer, advance, authPlayer, beginGeneration, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
 import { getStore, HttpError, mutate } from "@/lib/store";
@@ -38,7 +38,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
         case "start": {
           // Serverless (ASYNC_START=true, set by sst.config.ts) splits Start so a slow AI call cannot hit the function timeout:
           // this request only claims the room and the host tab then calls /generate. Everywhere else Start stays one request.
-          if (process.env.ASYNC_START === "true" && getTextModel()) { beginGeneration(room); out = { generating: true }; }
+          if (process.env.ASYNC_START === "true" && textModelFor(room) && !room.storyId) { beginGeneration(room); out = { generating: true }; }
           else { await startGame(room); out = { generating: false }; }
           break;
         }

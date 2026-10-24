@@ -1,9 +1,9 @@
 // AI guests: bots that hold a character card, chat with players, chime in at story beats, and speak aloud.
 // Secrecy rule: a bot's prompt is built from its OWN card plus PUBLIC information only. Only a killer bot knows the solution.
 import { randomBytes } from "node:crypto";
-import { getTextModel } from "./ai/config";
-import { getSpeech } from "./ai/speech";
-import { activePrices } from "./budget";
+import { pricesForRoom, speechFor, textModelFor } from "./ai/route";
+import type { TextModel } from "./ai/ports";
+import type { SpeechModel } from "./ai/speech-port";
 import { getMediaStore } from "./media-store";
 import { mutate } from "./store";
 import { HttpError } from "./storage";
@@ -128,12 +128,14 @@ interface Turn {
   room: Room;
   bot: Player;
   useModel: boolean;
+  text: TextModel | null;
+  speech: SpeechModel;
   useAudio: boolean;
   voice: string;
   reserved: number;
 }
 
-const speechCost = (chars: number) => chars * getSpeech().usdPerChar;
+const speechCost = (sp: SpeechModel, chars: number) => chars * sp.usdPerChar;
 
 /** Claims one bot turn inside a write: validates, rate limits, and reserves spend against the host's budget. */
 function claimTurn(room: Room, botId: string, kind: "reply" | "chatter", asker?: { id: string }): Turn {
@@ -150,18 +152,18 @@ function claimTurn(room: Room, botId: string, kind: "reply" | "chatter", asker?:
   room.botMessages = (room.botMessages ?? 0) + 1;
   const b = room.budget;
   const room$ = () => b.capUsd - b.spentUsd - b.reservedUsd;
-  const price = activePrices();
-  const useModel = !!getTextModel() && room$() >= price.botChat;
-  const speech = getSpeech();
-  const audioEst = speechCost(BOT_LIMITS.maxLineChars);
+  const price = pricesForRoom(room);
+  const text = textModelFor(room);
+  const useModel = !!text && room$() >= price.botChat;
+  const speech = speechFor(room);
+  const audioEst = speechCost(speech, BOT_LIMITS.maxLineChars);
   const useAudio = speech.kind === "server" && room.botConfig?.voice !== false && room$() - (useModel ? price.botChat : 0) >= audioEst;
   const reserved = (useModel ? price.botChat : 0) + (useAudio ? audioEst : 0);
   b.reservedUsd += reserved;
-  return { room: structuredClone(room), bot, useModel, useAudio, voice: bot.bot?.voice ?? speech.voices[0], reserved };
+  return { room: structuredClone(room), bot, useModel, text, speech, useAudio, voice: bot.bot?.voice ?? speech.voices[0], reserved };
 }
 
-async function speakLine(code: string, id: string, text: string, voice: string, signal: AbortSignal) {
-  const sp = getSpeech();
+async function speakLine(sp: SpeechModel, code: string, id: string, text: string, voice: string, signal: AbortSignal) {
   const out = await sp.synthesize(text, voice, signal);
   const ext = out.mime.includes("wav") ? "wav" : "mp3";
   const key = `${code}/gen/bot-${id}.${ext}`;
@@ -174,7 +176,7 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
   let usedModel = false;
   if (turn.useModel) {
     try {
-      const r = await getTextModel()!.generate({ system: prompt.system, user: prompt.user, maxOutputTokens: 160, temperature: 0.9, timeoutMs: 15_000, gameId: code });
+      const r = await turn.text!.generate({ system: prompt.system, user: prompt.user, maxOutputTokens: 160, temperature: 0.9, timeoutMs: 15_000, gameId: code });
       text = cleanLine(r.text);
       usedModel = !!text;
     } catch { /* falls back to the scripted line */ }
@@ -184,10 +186,10 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
   const id = rid();
   let audio: { key: string; mime: string } | null = null;
   if (turn.useAudio) {
-    try { audio = await speakLine(code, id, text, turn.voice, AbortSignal.timeout(10_000)); } catch { /* the browser will speak it instead */ }
+    try { audio = await speakLine(turn.speech, code, id, text, turn.voice, AbortSignal.timeout(10_000)); } catch { /* the browser will speak it instead */ }
   }
-  const price = activePrices();
-  const actual = (usedModel ? price.botChat : 0) + (audio ? speechCost(text.length) : 0);
+  const price = pricesForRoom(turn.room);
+  const actual = (usedModel ? price.botChat : 0) + (audio ? speechCost(turn.speech, text.length) : 0);
   const c = botCharacter(turn.room, turn.bot);
   const line: BotLine = {
     id, botId: turn.bot.id, speaker: c?.name ?? turn.bot.name, text, phase: meta.phase, kind, to: meta.to,

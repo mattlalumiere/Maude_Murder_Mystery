@@ -2,6 +2,8 @@ import { scryptSync, timingSafeEqual } from "node:crypto";
 import { LIMITS } from "./engine-limits";
 import { allocateJoinCode, getRuntime } from "./ids";
 import { fitPlan, recommend, TIERS } from "./budget";
+import { usesLocal } from "./ai/mode";
+import { caseOptionsFor, speechFor } from "./ai/route";
 import { getSpeech } from "./ai/speech";
 import { BOT_LIMITS, BOT_PERSONAS, queueBotChatter } from "./bots";
 import { generateCase } from "./gm-ai";
@@ -55,7 +57,10 @@ export async function createRoom(
   const config = sanitizeConfig(configIn);
   const cap = money(capIn);
   const expected = config.expected.adults + config.expected.kids + config.expected.toddlers;
-  const plan = fitPlan(sanitizePlan(planIn ?? (recommend(cap, expected).best ?? TIERS[0]).plan), cap, expected);
+  // Local services have no per-picture price, so the budget does not trim their plan.
+  const local = config.aiMode === "local";
+  const wanted = sanitizePlan(planIn ?? (local ? TIERS[4].plan : (recommend(cap, expected).best ?? TIERS[0]).plan));
+  const plan = local ? wanted : fitPlan(wanted, cap, expected);
   const store = getStore();
   const { random, ids } = getRuntime();
   const exists = opts.codeExists ?? (async (c: string) => (await store.get(c)) !== null);
@@ -209,6 +214,7 @@ export async function startGame(room: Room) {
       players: room.players.map((p, i) => ({ handle: `P${i + 1}`, ageGroup: p.ageGroup, mode: p.profile.backstoryMode, text: p.profile.backstory })),
     },
     room.config,
+    { gameId: room.code, ...caseOptionsFor(room) },
   );
   room.case = gen.case;
   room.caseSource = gen.source;
@@ -394,7 +400,8 @@ export function publicView(room: Room) {
       : room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: p.name, avatarId: undefined })),
     botLog: (room.botLog ?? []).slice(-25).map((l) => ({ id: l.id, botId: l.botId, speaker: l.speaker, text: l.text, kind: l.kind, to: l.to, phase: l.phase, audio: !!l.audioKey, ts: l.ts })),
     botConfig: { chatter: room.botConfig?.chatter !== false, voice: room.botConfig?.voice !== false },
-    speech: getSpeech().kind,
+    speech: speechFor(room).kind,
+    stt: usesLocal(room) ? "server" : "browser",
     drinking: room.config.drinking,
     roster, clues,
     ballotsOpen: room.ballotsOpen,
@@ -436,6 +443,8 @@ export function hostView(room: Room) {
     generating: room.generating ?? null,
     botQueued: (room.botQueue ?? []).length,
     caseSource: room.caseSource,
+    aiMode: room.config.aiMode ?? "auto",
+    localAi: usesLocal(room),
     budget: room.budget,
     jobs: room.media.slice(-60).map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, status: m.status, note: m.note, est: m.estCostUsd, caption: m.caption })),
     runSheet: PHASES.map((ph) => ({ phase: ph, ...PHASE_INFO[ph] })),
@@ -511,7 +520,7 @@ export function addBots(room: Room, count: number, styleHint?: string): Player[]
   const n = Math.max(1, Math.min(Math.round(Number(count) || 1), BOT_LIMITS.maxBots - have));
   if (have >= BOT_LIMITS.maxBots) throw new HttpError(409, `At most ${BOT_LIMITS.maxBots} AI guests`);
   if (room.players.length + n > LIMITS.maxPlayers) throw new HttpError(409, "Room is full");
-  const voices = getSpeech().voices;
+  const voices = speechFor(room).voices;
   const added: Player[] = [];
   for (let i = 0; i < n; i++) {
     const idx = (have + i) % BOT_PERSONAS.length;

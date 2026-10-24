@@ -12,7 +12,7 @@ export function BotsPanel({ state, act, busy }: { state: HostState; act: (b: obj
     <Card title="AI guests" data-testid="host-bots" style={{ marginTop: "var(--space-3)" }}>
       <p className="muted" style={{ marginTop: 0 }}>
         AI guests are extra suspects who chat with players and speak aloud. They count toward the minimum players and never see anyone else&apos;s secrets.
-        Voice: <Badge tone="ghost">{state.speech === "server" ? "cloud voices" : "browser voices (free)"}</Badge>
+        Voice: <Badge tone="ghost">{state.localAi ? "local voices" : state.speech === "server" ? "cloud voices" : "browser voices (free)"}</Badge>
       </p>
       {lobby && (
         <div className="sc-actions">

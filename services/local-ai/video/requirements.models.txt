@@ -1,0 +1,1 @@
+# Real video is ffmpeg only. Add a generative video model here if you have a GPU host.

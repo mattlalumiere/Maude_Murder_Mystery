@@ -100,6 +100,8 @@ export interface GameConfig {
   mustInclude: string;
   avoid: string;
   allowPlayerBackstory: boolean;
+  /** Which AI services to use: automatic (configured cloud or built-in), cloud only, or the local MCP-connected containers. */
+  aiMode?: "auto" | "cloud" | "local";
 }
 
 export interface MediaPlan {

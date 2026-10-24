@@ -28,6 +28,7 @@ export function sanitizeConfig(i: Partial<GameConfig> | undefined): GameConfig {
     mustInclude: clean(x.mustInclude, LIMITS.configPrompt),
     avoid: clean(x.avoid, LIMITS.configPrompt),
     allowPlayerBackstory: x.allowPlayerBackstory !== false,
+    aiMode: x.aiMode === "local" || x.aiMode === "cloud" ? x.aiMode : "auto",
   };
 }
 

@@ -1,0 +1,104 @@
+# Local AI services for Murder Mystery Night: voice, conversation, image and video behind one MCP endpoint.
+#   docker compose -f services/local-ai/compose.yml up --build          (mock models: tiny, instant, no downloads)
+#   LOCAL_AI_MODE=models docker compose -f services/local-ai/compose.yml up --build   (real models, big downloads)
+# The MCP endpoint is http://127.0.0.1:8765/mcp. Backends are on a private network and are not published.
+# A containerised web app reaches it at http://host.docker.internal:8765/mcp (set AI_BIND=0.0.0.0 and LOCAL_AI_TOKEN).
+name: maude-ai
+
+x-hardened: &hardened
+  read_only: true
+  tmpfs: ["/tmp:size=128m"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+x-build-mode: &mode
+  args:
+    MODE: ${LOCAL_AI_MODE:-mock}
+
+services:
+  ai-mcp:
+    <<: *hardened
+    build: ./mcp
+    environment:
+      TTS_URL: http://ai-tts:8766
+      STT_URL: http://ai-stt:8767
+      IMAGE_URL: http://ai-image:8768
+      VIDEO_URL: http://ai-video:8769
+      # Conversation uses any OpenAI-compatible server. Default: the model server on the Mac host (mlx_lm). Set CHAT_MODE=mock for canned replies.
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8080/v1}
+      LLM_MODEL: ${LLM_MODEL:-mlx-community/Qwen3-Coder-30B-A3B-Instruct-4bit}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      CHAT_MODE: ${CHAT_MODE:-llm}
+      LOCAL_AI_TOKEN: ${LOCAL_AI_TOKEN:-}
+    ports: ["${AI_BIND:-127.0.0.1}:8765:8765"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      ai-tts: { condition: service_healthy }
+      ai-stt: { condition: service_healthy }
+      ai-image: { condition: service_healthy }
+      ai-video: { condition: service_healthy }
+    mem_limit: 256m
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 5
+      start_period: 10s
+
+  ai-tts:
+    <<: *hardened
+    build: { context: ./tts, <<: *mode }
+    volumes: ["models:/models"]
+    mem_limit: 1g
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8766/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 15s
+
+  ai-stt:
+    <<: *hardened
+    build: { context: ./stt, <<: *mode }
+    volumes: ["models:/models"]
+    mem_limit: 2g
+    pids_limit: 128
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8767/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 15s
+
+  # Containers on Apple Silicon have no GPU access, so the real diffusion model runs on CPU here (slow).
+  # For speed run the image service natively (see README) and point IMAGE_URL at it.
+  ai-image:
+    <<: *hardened
+    build: { context: ./image, <<: *mode }
+    volumes: ["models:/models"]
+    mem_limit: 6g
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8768/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 20s
+
+  ai-video:
+    <<: *hardened
+    build: { context: ./video, <<: *mode }
+    mem_limit: 1g
+    pids_limit: 256
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8769/healthz', timeout=3).status == 200 else 1)"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+      start_period: 15s
+
+volumes:
+  models:

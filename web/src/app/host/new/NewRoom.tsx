@@ -6,6 +6,7 @@ import { estimate, PRICES, recommend, TIERS } from "@/lib/budget";
 import { api, createGame, formatUsd, friendlyError, useAction, validateWizardStep, WIZARD_STEPS, wizardProgress } from "@/lib/client";
 import type { GameConfig, MediaPlan } from "@/lib/types";
 import type { StoryDetail } from "@/lib/client";
+import { AiModeCard } from "./AiModeCard";
 
 const DEFAULT: GameConfig = {
   name: "", expected: { adults: 12, kids: 6, toddlers: 1 }, lengthMin: 120, spice: "medium", drinking: "adults",
@@ -50,8 +51,9 @@ export default function NewRoom() {
 
   const players = cfg.expected.adults + cfg.expected.kids + cfg.expected.toddlers;
   const rec = useMemo(() => recommend(budget, players), [budget, players]);
-  const activePlan: MediaPlan = plan ?? rec.best?.plan ?? TIERS[0].plan;
-  const est = estimate(activePlan, players);
+  const localAi = cfg.aiMode === "local";
+  const activePlan: MediaPlan = plan ?? (localAi ? TIERS[4].plan : rec.best?.plan ?? TIERS[0].plan);
+  const est = localAi ? { lines: [{ label: "Local services (no per-picture cost)", usd: 0 }], total: 0 } : estimate(activePlan, players);
   const over = est.total > budget;
   const set = <K extends keyof GameConfig>(k: K, v: GameConfig[K]) => setCfg((c) => ({ ...c, [k]: v }));
   const input = { expected: cfg.expected, overrideCode: code, budget };
@@ -160,6 +162,7 @@ export default function NewRoom() {
             <h1 ref={heading} tabIndex={-1}>Pictures and video</h1>
             <p className="sc-lead">The AI can draw your guests into the story. Pick a budget and see what it buys. The server never spends past it.</p>
           </div>
+          <AiModeCard value={cfg.aiMode ?? "auto"} onChange={(m) => set("aiMode", m)} />
           <Card>
             <Field label="Most you want to spend on AI (USD)" hint={rec.summary} error={validateWizardStep(3, input)}>
               <input type="number" inputMode="decimal" min={0} max={500} step={1} value={Number.isNaN(budget) ? "" : budget} data-testid="field-budget"

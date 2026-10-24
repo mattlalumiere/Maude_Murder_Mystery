@@ -30,6 +30,9 @@ export default function Privacy() {
       <h2>Saved and shared stories</h2>
       <p>A host can save a game&apos;s story to share it. The saved mystery is sealed so replayers cannot read the answer. If the host adds a recap, it may show the story, clues, scores and awards. The recap uses character names by default; real names and the game&apos;s pictures are only included for link-only stories when the host chooses them, and never for public stories. Saved stories stay until the host deletes them. Votes are counted without names.</p>
 
+      <h2>Local AI mode</h2>
+      <p>If the host chose local AI services, chat, voices, pictures and video are produced by software running on the host&apos;s own computer, and photos and voice recordings are not sent to a cloud service for that game. Voice input in this mode is recorded for a few seconds, transcribed locally, and discarded.</p>
+
       <h2>Who else sees your data</h2>
       <p>Your text and photo are sent to the AI and cloud services the host has configured for this game (for example AWS Bedrock, Rekognition, and S3) only to run the game. We do not sell data or use it to train models.</p>
 

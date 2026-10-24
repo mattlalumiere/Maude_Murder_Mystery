@@ -17,6 +17,10 @@ export interface ImageRequest {
   refs: Buffer[];
   shape: "square" | "wide";
   quality: "standard" | "premium";
+  /** Used by diffusion models that take them (local services). */
+  negative?: string;
+  /** 0.05 to 1: how far to move away from the reference photo (lower keeps more of the face). */
+  strength?: number;
 }
 export interface Generated { bytes: Buffer; mime: string }
 
