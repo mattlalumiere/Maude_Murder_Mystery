@@ -1,9 +1,9 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 import { PhotoPicker, uploadPhoto } from "@/components/PhotoUploader";
 import { Badge, Brand, Button, Card, ErrorNote, Field, Notice } from "@/components/kit";
-import { canJoin, joinGame, normalizeCode, saveCreds, useAction, useDocTitle } from "@/lib/client";
+import { api, canJoin, joinGame, normalizeCode, saveCreds, useAction, useDocTitle } from "@/lib/client";
 import type { AgeGroup } from "@/lib/types";
 
 type Mode = "gm" | "hint" | "own";
@@ -26,12 +26,20 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
   const { busy, err, run } = useAction();
   useDocTitle(`Join ${code}`);
 
+  // Replaying a saved story where players choose their character.
+  type Opt = { id: string; name: string; house: string; tease: string; kid: boolean; taken: boolean };
+  const [options, setOptions] = useState<Opt[] | null>(null);
+  const [choice, setChoice] = useState("");
+  useEffect(() => {
+    api<{ characters: Opt[] }>(`/api/rooms/${code}/characters`).then((r) => setOptions(r.characters)).catch(() => setOptions(null));
+  }, [code]);
+
   const toddler = age === "little";
   const ok = canJoin({ name, age, mode, text, photoBlob: !!photo.blob, photoConsent: !!photo.consent });
 
   async function join() {
     const r = await run(() => joinGame(code, {
-      name: name.trim(), ageGroup: age, wantsVictim,
+      name: name.trim(), ageGroup: age, wantsVictim, ...(choice ? { characterChoice: choice } : {}),
       profile: { backstoryMode: toddler ? "gm" : mode, backstory: mode === "gm" || toddler ? "" : text },
     }));
     if (!r) return;
@@ -68,6 +76,23 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
             </label>
           )}
         </Card>
+        {options && (
+          <Card title="Choose your character" data-testid="join-characters">
+            <p className="muted" style={{ marginTop: 0 }}>Pick who you want to be, or leave it to the Game Master. Characters other players already asked for are greyed out. {age === "adult" ? "Showing grown-up characters." : "Showing young characters."}</p>
+            <div className="sc-actions">
+              <Button variant={choice === "" ? "primary" : "secondary"} onClick={() => setChoice("")} data-testid="char-surprise">Surprise me</Button>
+            </div>
+            <ul className="clean">
+              {options.filter((o) => o.kid === (age !== "adult")).map((o) => (
+                <li key={o.id}>
+                  <Button variant={choice === o.id ? "primary" : "secondary"} className="sc-pick" disabled={o.taken} onClick={() => setChoice(o.id)} data-testid={`char-${o.id}`}>
+                    <b>{o.name}</b> <span className="muted">{o.house}</span><br /><span className="muted">{o.tease}</span>{o.taken ? " (taken)" : ""}
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         {!toddler && (
           <Card title="Your backstory">

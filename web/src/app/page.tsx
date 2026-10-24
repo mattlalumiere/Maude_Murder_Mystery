@@ -32,6 +32,7 @@ export default function Home() {
       <Card title="Hosting tonight?" style={{ marginTop: "var(--space-4)" }} data-testid="landing-host">
         <p className="muted">Sign in once to set up a game. Guests never need an account.</p>
         <ButtonLink href="/host/new" variant="secondary" block data-testid="landing-host-link">Host a game</ButtonLink>
+        <p style={{ marginBottom: 0 }}><ButtonLink href="/stories" variant="ghost" block data-testid="landing-stories-link">Browse and vote on stories</ButtonLink></p>
       </Card>
     </main>
   );

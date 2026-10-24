@@ -26,12 +26,17 @@ export default $config({
       rules: [{ id: "expire-1d", status: "Enabled", filter: {}, expiration: { days: 1 } }],
     });
 
+    // Saved stories must outlive a game, so they live in their own bucket with NO expiry rule.
+    const stories = new sst.aws.Bucket("Stories", {});
+
     new sst.aws.Nextjs("Web", {
       path: ".",
-      link: [rooms, media],
+      link: [rooms, media, stories],
       environment: {
         ROOMS_TABLE: rooms.name,
         MEDIA_BUCKET: media.name,
+        STORY_BUCKET: stories.name,
+        STORY_SEAL_KEY: process.env.STORY_SEAL_KEY ?? "",
         BEDROCK_MODEL_ID: process.env.BEDROCK_MODEL_ID ?? "",
         MEDIA_PROVIDER: process.env.MEDIA_PROVIDER ?? "bedrock",
         AUTH_SECRET: process.env.AUTH_SECRET ?? "",

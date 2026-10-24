@@ -5,6 +5,7 @@ import { fitPlan, recommend, TIERS } from "./budget";
 import { getSpeech } from "./ai/speech";
 import { BOT_LIMITS, BOT_PERSONAS, queueBotChatter } from "./bots";
 import { generateCase } from "./gm-ai";
+import { openStoryCase, recordPlay } from "./stories";
 import { queueAvatars, queuePhaseMedia, reconcilePlan } from "./media-jobs";
 import { getMediaStore } from "./media-store";
 import { money, sanitizeConfig, sanitizePlan, sanitizeProfile } from "./sanitize";
@@ -40,6 +41,8 @@ const shuffle = <T,>(a: T[]) => {
 export interface CreateRoomOptions {
   /** Directory lookup (code to gameId). Return true if the join code is already taken. */
   codeExists?: (code: string) => Promise<boolean>;
+  /** Replay a saved story. The route has already checked that it exists. */
+  story?: { id: string; mode: "random" | "choose" };
 }
 
 export async function createRoom(
@@ -69,13 +72,14 @@ export async function createRoom(
       failedOverrides: 0, lockedUntil: 0, overrideUsed: false,
       phase: "lobby", phaseStartedAt: now(), paused: false,
       players: [], releasedClueIds: [], ballotsOpen: false,
+      ...(opts.story ? { storyId: opts.story.id, storyMode: opts.story.mode } : {}),
     };
     if (await store.put(room, null)) return room;
   }
   throw new HttpError(500, "Could not allocate a room code");
 }
 
-export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>): Player {
+export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>, characterChoice?: string): Player {
   if (room.phase !== "lobby") throw new HttpError(409, "The game has already started");
   if (room.generating && now() - room.generating < GENERATION_LOCK_MS) throw new HttpError(409, "The host is starting the game. Please wait a moment.");
   const clean = String(name ?? "").trim().slice(0, LIMITS.playerName);
@@ -87,6 +91,7 @@ export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVic
     id: rid(6), name: clean, ageGroup, wantsVictim, token: rid(18), ready: false, hasDevice,
     profile: sanitizeProfile(profile, room.config.allowPlayerBackstory),
   };
+  if (room.storyMode === "choose" && typeof characterChoice === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(characterChoice)) p.wantsCharacter = characterChoice;
   room.players.push(p);
   return p;
 }
@@ -124,18 +129,41 @@ function castPlayers(room: Room) {
   const taken = new Set<string>();
   const assign = (p: Player, c: Character) => { p.characterId = c.id; taken.add(c.id); };
 
+  // Choose-your-character stories: honour requests first (first come, first served, only a fitting character).
+  if (room.storyMode === "choose") {
+    for (const p of room.players) {
+      if (p.isBot || !p.wantsCharacter || p.characterId) continue;
+      const c = chars.find((x) => x.id === p.wantsCharacter);
+      if (!c || taken.has(c.id)) continue;
+      const young = p.ageGroup !== "adult";
+      if (c.kid !== young) continue; // grown-up characters go to grown-ups, young characters to young players
+      if (c.id === k.victimId && !(young || p.wantsVictim)) continue;
+      assign(p, c);
+    }
+  }
+
   // Victim: volunteer kid/teen > any kid/teen > volunteer adult > random adult.
-  const young = room.players.filter((p) => p.ageGroup === "kid" || p.ageGroup === "teen");
+  const young = room.players.filter((p) => (p.ageGroup === "kid" || p.ageGroup === "teen") && !p.characterId);
   const victimPlayer =
     young.find((p) => p.wantsVictim) ?? young.find((p) => p.ageGroup === "kid") ?? young[0] ??
-    room.players.find((p) => p.wantsVictim && p.ageGroup === "adult" && !p.isBot) ?? shuffle(room.players.filter((p) => p.ageGroup === "adult" && !p.isBot))[0];
+    room.players.find((p) => p.wantsVictim && p.ageGroup === "adult" && !p.isBot && !p.characterId) ?? shuffle(room.players.filter((p) => p.ageGroup === "adult" && !p.isBot && !p.characterId))[0];
   const victim = chars.find((c) => c.id === k.victimId)!;
-  assign(victimPlayer, victim);
+  if (!taken.has(victim.id)) {
+    // If every eligible player already asked for another character, one of them gives theirs up for the victim role.
+    const who = victimPlayer ?? shuffle(room.players.filter((p) => !p.isBot))[0];
+    if (who.characterId) taken.delete(who.characterId);
+    assign(who, victim);
+  }
 
   // Killer goes to a random adult.
   const adults = shuffle(room.players.filter((p) => p.ageGroup === "adult" && !p.characterId));
   const killer = chars.find((c) => c.id === k.killerId)!;
-  assign(adults.shift()!, killer);
+  if (!taken.has(killer.id)) {
+    // A requested character is released if that is the only way to give the killer role to a grown-up.
+    const who = adults.shift() ?? shuffle(room.players.filter((p) => p.ageGroup === "adult" && p.characterId !== victim.id))[0];
+    if (who.characterId) taken.delete(who.characterId);
+    assign(who, killer);
+  }
 
   // Remaining adults (characters written for a player's note go to that player first).
   const handle = (p: Player) => `P${room.players.indexOf(p) + 1}`;
@@ -173,7 +201,9 @@ export async function startGame(room: Room) {
   if (room.players.length < LIMITS.minPlayers) throw new HttpError(400, `Need at least ${LIMITS.minPlayers} players`);
   if (room.players.filter((p) => p.ageGroup === "adult").length < LIMITS.minAdults) throw new HttpError(400, `Need at least ${LIMITS.minAdults} adults`);
   const adults = room.players.filter((p) => p.ageGroup === "adult").length;
-  const gen = await generateCase(
+  const gen = room.storyId
+    ? { case: await openStoryCase(room.storyId), source: "story" as const }
+    : await generateCase(
     {
       adults, kids: room.players.length - adults, littles: room.players.filter((p) => p.ageGroup === "little").length,
       players: room.players.map((p, i) => ({ handle: `P${i + 1}`, ageGroup: p.ageGroup, mode: p.profile.backstoryMode, text: p.profile.backstory })),
@@ -185,6 +215,7 @@ export async function startGame(room: Room) {
   castPlayers(room);
   queueAvatars(room);
   setPhase(room, "cards");
+  if (room.storyId) void recordPlay(room.storyId, room.code).catch(() => {});
 }
 
 /** Fast first half of Start: validates and claims the room. The slow AI call happens in /generate, outside this write. */
@@ -357,6 +388,7 @@ export function publicView(room: Room) {
     narration: k?.narration[room.phase],
     lobbyNames: room.players.map((p) => p.name),
     starting: !!room.generating,
+    storyId: room.storyId ?? null,
     bots: room.case
       ? room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: room.case!.characters.find((c) => c.id === p.characterId)?.name ?? p.name, avatarId: p.profile.avatarId }))
       : room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: p.name, avatarId: undefined })),

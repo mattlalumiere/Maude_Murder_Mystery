@@ -22,6 +22,7 @@ Everything is fiction. Anyone can say "Pass". Alcohol is always optional.
 - **120-minute run sheet** with an intermission and fixed beats.
 - **Fair, solvable cases** with three independent clue paths and resolved red herrings.
 - **Drinking and silly mechanics** that are optional, safe, and passable.
+- **Save and share stories:** teams can save a mystery (storyline only, or with its characters so new players pick who to be), share it by link or in a public gallery, add a spoiler-gated recap, and vote on the best ones. The solution stays sealed even from the replaying host.
 - **AI guests (bots):** the host can add AI characters that chat with players, chime in at story beats, and speak aloud through the selected cloud's speech service (Amazon Polly on AWS, Azure AI Speech on Azure, free browser voices by default). They only know their own card plus public clues.
 - **Voice mode:** spoken roll call, cast announcement, and narration.
 - **Host Override Code:** nudge, advanced clue, accelerate, or the final answer if the game runs long.

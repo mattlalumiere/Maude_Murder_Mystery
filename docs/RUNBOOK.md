@@ -64,6 +64,10 @@ Fix anything that failed before inviting guests.
 
 With `CLOUD_PROVIDER=aws` (set in `sst.config.ts`) AI guests speak through **Amazon Polly** (neural voices; the deploy role already gets `polly:SynthesizeSpeech`). Polly needs no model-access request, but confirm the neural voices exist in your region. Include one AI guest and one cloud-voiced reply in the dry run. Cost is small (roughly 16 USD per million characters, about a quarter of a cent per line). For Azure set `CLOUD_PROVIDER=azure`, `AZURE_SPEECH_KEY`, and `AZURE_SPEECH_REGION`.
 
+## 4c. Saved stories (optional)
+
+Saved stories live in a separate **Stories** bucket with no expiry rule (the Media bucket deletes everything after one day). `sst.config.ts` creates it and passes `STORY_BUCKET`. Set `STORY_SEAL_KEY` (`openssl rand -base64 32`) before the first deploy and keep it: changing it makes existing saved stories unreadable. Dry run: save a story from a finished game, open its page in a private window, vote, and start a game from it. Note the gallery index and vote counters are plain objects with last-writer-wins updates; a very busy gallery could show slightly stale counts.
+
 ## 5. Party-day checklist
 
 - [ ] Deploy at least a day ahead; re-run `/api/healthz`.

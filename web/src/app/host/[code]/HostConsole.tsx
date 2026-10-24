@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BotsPanel } from "./BotsPanel";
 import { BudgetPanel } from "./BudgetPanel";
+import { SaveStoryCard } from "./SaveStoryCard";
 import type { HostState } from "@/app/_views";
 import { CopyButton } from "@/components/CopyButton";
 import { Qr } from "@/components/Qr";
@@ -179,6 +180,8 @@ export default function HostConsole({ code }: { code: string }) {
       </Card>
 
       <BotsPanel state={state} act={act} busy={busy} />
+
+      {!lobby && !state.generating && <SaveStoryCard code={code} phase={state.phase} defaultTitle={state.title ?? "Our mystery"} />}
 
       <Card title="Invite players" style={{ marginTop: "var(--space-3)" }} data-testid="host-invite">
         <div className="sc-invite">

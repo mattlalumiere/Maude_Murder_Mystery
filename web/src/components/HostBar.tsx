@@ -6,6 +6,7 @@ export async function HostBar() {
   return (
     <header className="sc-hostbar" data-testid="host-bar">
       <Link href="/" className="sc-hostbar__brand">Murder Mystery Night</Link>
+      <nav className="sc-hostbar__who"><Link href="/stories" className="mm-btn mm-btn--ghost" data-testid="nav-stories">Stories</Link></nav>
       <form action={async () => { "use server"; await signOut({ redirectTo: "/" }); }} className="sc-hostbar__who">
         <span className="sc-hostbar__name">{s?.user?.name ?? s?.user?.email}</span>
         <button className="mm-btn mm-btn--ghost" type="submit" data-testid="sign-out">Sign out</button>

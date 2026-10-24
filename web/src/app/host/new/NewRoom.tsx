@@ -1,10 +1,11 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Card, ErrorNote, Field, Progress } from "@/components/kit";
+import { Badge, Button, Card, ErrorNote, Field, Notice, Progress } from "@/components/kit";
 import { estimate, PRICES, recommend, TIERS } from "@/lib/budget";
-import { createGame, formatUsd, friendlyError, useAction, validateWizardStep, WIZARD_STEPS, wizardProgress } from "@/lib/client";
+import { api, createGame, formatUsd, friendlyError, useAction, validateWizardStep, WIZARD_STEPS, wizardProgress } from "@/lib/client";
 import type { GameConfig, MediaPlan } from "@/lib/types";
+import type { StoryDetail } from "@/lib/client";
 
 const DEFAULT: GameConfig = {
   name: "", expected: { adults: 12, kids: 6, toddlers: 1 }, lengthMin: 120, spice: "medium", drinking: "adults",
@@ -35,6 +36,17 @@ export default function NewRoom() {
   const [stepErr, setStepErr] = useState("");
   const { busy, err, run } = useAction();
   const heading = useRef<HTMLHeadingElement>(null);
+  // Replaying a saved story: ?story=ID. The story is fixed, so theme prompts do not apply.
+  const [story, setStory] = useState<StoryDetail["story"] | null>(null);
+  const [storyMode, setStoryMode] = useState<"random" | "choose">("random");
+  const [storyErr, setStoryErr] = useState("");
+  useEffect(() => {
+    const id = new URLSearchParams(location.search).get("story");
+    if (!id) return;
+    api<StoryDetail>(`/api/stories/${encodeURIComponent(id)}`)
+      .then((d) => { setStory(d.story); setStoryMode(d.story.kind === "cast" ? "choose" : "random"); })
+      .catch(() => setStoryErr("That saved story could not be found. You can still set up a new game."));
+  }, []);
 
   const players = cfg.expected.adults + cfg.expected.kids + cfg.expected.toddlers;
   const rec = useMemo(() => recommend(budget, players), [budget, players]);
@@ -55,7 +67,7 @@ export default function NewRoom() {
   async function create() {
     const m = validateWizardStep(4, input) || validateWizardStep(3, input);
     if (m) { setStepErr(m); return; }
-    const r = await run(() => createGame({ overrideCode: code, config: cfg, capUsd: budget, plan: activePlan }));
+    const r = await run(() => createGame({ overrideCode: code, config: cfg, capUsd: budget, plan: activePlan, ...(story ? { storyId: story.id, storyMode } : {}) }));
     if (r) router.push(`/host/${r.code}`);
   }
 
@@ -76,6 +88,21 @@ export default function NewRoom() {
             <h1 ref={heading} tabIndex={-1}>Who is coming?</h1>
             <p className="sc-lead">A rough head count is enough. People can still join later.</p>
           </div>
+          {storyErr && <ErrorNote>{storyErr}</ErrorNote>}
+          {story ? (
+            <Card title="Replaying a saved story" tone="glow" data-testid="wizard-story">
+              <p style={{ marginTop: 0 }}><b>{story.title}</b><br /><span className="muted">{story.blurb || story.setting}</span></p>
+              {story.kind === "cast" ? (
+                <>
+                  <label className="sc-check"><input type="radio" name="smode" checked={storyMode === "choose"} onChange={() => setStoryMode("choose")} data-testid="story-mode-choose" /><span><b>Players choose their character</b> when they join.</span></label>
+                  <label className="sc-check"><input type="radio" name="smode" checked={storyMode === "random"} onChange={() => setStoryMode("random")} data-testid="story-mode-random" /><span>Cast players at random.</span></label>
+                </>
+              ) : <p className="muted">Players are cast at random.</p>}
+              <p className="muted" style={{ fontSize: "var(--text-xs)", marginBottom: 0 }}>The plot and solution are fixed and sealed, so you can play too. <a href="/host/new">Start a brand new story instead</a>.</p>
+            </Card>
+          ) : (
+            <p className="muted" style={{ margin: 0 }}>Want a mystery someone else already played? <a href="/stories">Browse saved stories</a>.</p>
+          )}
           <Card>
             <Field label="Party name" hint="Leave it blank and the Game Master will pick one.">
               <input value={cfg.name} maxLength={60} placeholder="GM's pick" data-testid="field-name" onChange={(e) => set("name", e.target.value)} />
@@ -112,6 +139,7 @@ export default function NewRoom() {
             <h1 ref={heading} tabIndex={-1}>What is the story?</h1>
             <p className="sc-lead">Every box is optional. Blank means the Game Master surprises you.</p>
           </div>
+          {story && <Notice data-testid="wizard-story-note">You are replaying &quot;{story.title}&quot;, so the story is already written. These boxes are ignored; spice and drinking still apply.</Notice>}
           <Card>
             <Field label="Theme or story idea"><input value={cfg.themePrompt} placeholder="e.g. a cruise ship karaoke night" data-testid="field-theme" onChange={(e) => set("themePrompt", e.target.value)} /></Field>
             <Field label="Setting"><input value={cfg.settingPrompt} placeholder="e.g. a snowed-in ski lodge" data-testid="field-setting" onChange={(e) => set("settingPrompt", e.target.value)} /></Field>

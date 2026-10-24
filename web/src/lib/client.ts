@@ -9,9 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export type Headers_ = Record<string, string>;
 export type Creds = { pid: string; tok: string };
 
-export async function api<T = unknown>(path: string, body?: unknown, headers: Headers_ = {}): Promise<T> {
+export async function api<T = unknown>(path: string, body?: unknown, headers: Headers_ = {}, method?: "GET" | "POST" | "DELETE"): Promise<T> {
   const res = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
+    method: method ?? (body === undefined ? "GET" : "POST"),
     headers: { "Content-Type": "application/json", ...headers },
     body: body === undefined ? undefined : JSON.stringify(body),
     cache: "no-store",
@@ -23,7 +23,7 @@ export async function api<T = unknown>(path: string, body?: unknown, headers: He
 
 export const credHeaders = (c: Creds): Headers_ => ({ "x-player-id": c.pid, "x-player-token": c.tok });
 
-export const createGame = (b: { overrideCode: string; config: unknown; capUsd: number; plan: unknown }) =>
+export const createGame = (b: { overrideCode: string; config: unknown; capUsd: number; plan: unknown; storyId?: string; storyMode?: string }) =>
   api<{ code: string }>("/api/rooms", b);
 export const joinGame = (code: string, b: unknown) => api<{ playerId: string; token: string }>(`/api/rooms/${code}/join`, b);
 export const sendAction = <T = Record<string, unknown>>(code: string, body: object, headers: Headers_ = {}) =>
@@ -36,6 +36,17 @@ export const chatWithBot = (code: string, botId: string, message: string, creds:
   api<{ line: BotLineView }>(`/api/rooms/${code}/bots/${botId}/chat`, { message }, credHeaders(creds));
 export const runBotTick = (code: string) => api(`/api/rooms/${code}/bots/tick`, {});
 export const botAudioUrl = (code: string, id: string) => `/api/rooms/${code}/bots/audio/${id}`;
+export type StoryCard = { id: string; title: string; blurb: string; kind: "story" | "cast"; savedAt: number; castCount: number; votes: number; playedVotes: number; plays: number };
+export type StoryDetail = {
+  story: { id: string; title: string; blurb: string; kind: "story" | "cast"; visibility: "link" | "public"; savedAt: number; setting: string; castCount: number; houses: string[]; characters?: { id: string; name: string; house: string; tease: string; kid: boolean }[]; hasRecap: boolean; recapNames: boolean; recapPictures: boolean };
+  engagement: { votes: number; playedVotes: number; plays: number; reports: number }; mine: boolean; signedIn: boolean;
+};
+export type RecapView = {
+  title: string; partyName: string; narration: Record<string, string>; clues: string[];
+  reveal?: { killer: string; method: string; motive: string; story: string }; scores: { name: string; points: number }[]; awards: { award: string; to: string }[];
+  images: { id: string; kind: string; caption: string; mime: string }[];
+};
+export const storyUrl = (id: string) => `/stories/${id}`;
 export const mediaUrl = (code: string, id: string) => `/api/rooms/${code}/media/${id}`;
 
 export async function uploadPhotoBlob(code: string, creds: Creds, blob: Blob, consent: "self" | "guardian") {

@@ -177,6 +177,8 @@ export interface Player {
   /** AI guest: has no device or photo, and speaks through the bot engine. */
   isBot?: boolean;
   bot?: BotProfile;
+  /** Character this player asked for (choose-your-character stories). */
+  wantsCharacter?: string;
   token: string;
   characterId?: string;
   ready: boolean;
@@ -218,7 +220,10 @@ export interface Room {
   paused: boolean;
   players: Player[];
   case?: CaseFile;
-  caseSource?: "sample" | "bedrock";
+  caseSource?: "sample" | "bedrock" | "story";
+  /** Saved story this game replays, and whether players pick their own character from it. */
+  storyId?: string;
+  storyMode?: "random" | "choose";
   releasedClueIds: string[];
   ballotsOpen: boolean;
   /** Set (epoch ms) while the host-triggered case generation is running; null/undefined otherwise. */

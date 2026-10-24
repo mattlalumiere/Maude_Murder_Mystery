@@ -117,3 +117,10 @@ button.mm-seal:active { transform: scale(0.94); }
   .mm-fog__layer { animation: none; }
   .mm-candle__flame { animation: none; }
 }
+
+/* Saved stories and gallery */
+.sc-fieldset { border: 1px solid var(--line, #3a2d28); border-radius: var(--radius, 12px); padding: var(--space-3, 12px); margin: var(--space-3, 12px) 0; }
+.sc-fieldset legend { padding: 0 6px; font-weight: 600; }
+.sc-story-grid { display: grid; gap: var(--space-3, 12px); grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.sc-story-card a { color: inherit; text-decoration: none; display: block; }
+.sc-pick { text-align: left; width: 100%; }

@@ -2,7 +2,7 @@
 import type { BotLineView, BotView } from "@/lib/client";
 import type { BudgetState, CharacterCard, GameConfig } from "@/lib/types";
 
-export type BotCommon = { bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
+export type BotCommon = { storyId?: string | null; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
 
 export type MediaItemView = { id: string; kind: string; phase: string; caption: string; mime?: string };
 

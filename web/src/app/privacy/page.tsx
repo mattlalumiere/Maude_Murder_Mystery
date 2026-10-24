@@ -27,6 +27,9 @@ export default function Privacy() {
       <h2>AI guests and voices</h2>
       <p>The host can add AI guests. What you type to them is sent to the AI service the host has configured, along with their character card and the clues everyone has seen, and never other players&apos; secrets. When cloud voices are on, their replies are turned into speech by the host&apos;s cloud voice service. The &quot;Speak&quot; button, offered to grown-ups only, uses your browser&apos;s built-in speech recognition, which may send your voice to the browser&apos;s maker (for example Google or Apple). Children can type but not speak to the AI guests. Chat lines are kept only for the length of the game.</p>
 
+      <h2>Saved and shared stories</h2>
+      <p>A host can save a game&apos;s story to share it. The saved mystery is sealed so replayers cannot read the answer. If the host adds a recap, it may show the story, clues, scores and awards. The recap uses character names by default; real names and the game&apos;s pictures are only included for link-only stories when the host chooses them, and never for public stories. Saved stories stay until the host deletes them. Votes are counted without names.</p>
+
       <h2>Who else sees your data</h2>
       <p>Your text and photo are sent to the AI and cloud services the host has configured for this game (for example AWS Bedrock, Rekognition, and S3) only to run the game. We do not sell data or use it to train models.</p>
 

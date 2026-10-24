@@ -119,3 +119,15 @@ Say "voice" at the start. The AI runs a spoken roll call, announces the cast wit
 - Voices: free browser voices by default. With `CLOUD_PROVIDER=aws` they use Amazon Polly, with `azure` Azure AI Speech. The host console shows which is active.
 - At the reveal the AI guests cast their own accusations, using only the public clues. They appear on the scoreboard but never win the human awards.
 - The host can mute chatter or cloud voices at any time from the AI guests card. Spending counts against your AI budget, and when it runs out the guests fall back to scripted replies and free browser voices.
+
+## Save and share a story
+
+After a game (or any time after the cards are dealt) the host console has **Save and share this story**.
+
+- **Storyline only:** keeps the plot, clues and twist. When someone replays it, players are cast at random.
+- **Storyline and characters:** also lets the next group **choose which character to be** when they join. Characters nobody picks are left out, and picks that do not fit (a grown-up asking for a young character) are ignored.
+- **Recap (after the reveal):** optionally share how your night went. Readers see it behind a spoiler warning. You can use players' real names and include the game's pictures for link-only stories. **Public stories never include real names or pictures of players.**
+- **Link only or Public gallery:** link-only stories are only for people you send the link to. Public ones appear in the gallery at `/stories`, where anyone signed in as a host can vote, and players of a replayed story can vote from their own phone after the reveal.
+- The solution is **sealed** on the server. Nobody who replays a story, including the host who starts it, can read the answer in the app. Your own copy follows the same rule.
+- To play someone else's story, open its page, press **Host a game with this story**, and carry on as usual. Theme prompts are ignored because the story is already written.
+- Votes: one per account, and one per player of a replayed game. Three reports hide a story from the gallery. Owners can delete their stories from the story page.
