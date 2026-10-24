@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
-import { Card, Field } from "@/components/kit";
+import { useRef, useState } from "react";
+import { CameraCapture, liveCameraAvailable } from "@/components/CameraCapture";
+import { Button, Card, Field } from "@/components/kit";
 import { uploadPhotoBlob, type Creds } from "@/lib/client";
 
 /** Downsizes a photo to a JPEG no larger than `max` pixels on its long side. */
@@ -23,7 +24,21 @@ export function PhotoPicker({
   const [agreed, setAgreed] = useState(false);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [err, setErr] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const nativeCamera = useRef<HTMLInputElement>(null);
   const consent = isAdult ? "self" : "guardian";
+
+  function takePhoto() {
+    setErr("");
+    // Live in-browser camera when the page is secure; otherwise hand off to the phone's own camera app.
+    if (liveCameraAvailable()) setCameraOpen(true);
+    else nativeCamera.current?.click();
+  }
+  function accept(b: Blob) {
+    setErr("");
+    setBlob(b); setPreview(URL.createObjectURL(b));
+    onChange({ blob: b, consent: agreed ? consent : null });
+  }
 
   async function pick(f?: File) {
     setErr("");
@@ -37,9 +52,16 @@ export function PhotoPicker({
 
   return (
     <Card title="A cartoon look-alike (optional)" data-testid="photo-picker">
-      <Field label="Choose or take a photo" hint="Skip it and the GM draws you without a likeness.">
-        <input type="file" accept="image/*" capture="user" disabled={disabled} data-testid="photo-input" onChange={(e) => pick(e.target.files?.[0])} />
-      </Field>
+      <p className="muted" style={{ marginTop: 0 }}>Take a selfie now or pick one you already have. Skip it and the GM draws you without a likeness.</p>
+      <div className="sc-actions">
+        <Button type="button" disabled={disabled} onClick={takePhoto} data-testid="photo-take">{blob ? "Retake photo" : "Take a photo"}</Button>
+        <Field label="Or choose a photo">
+          <input type="file" accept="image/*" disabled={disabled} data-testid="photo-input" onChange={(e) => pick(e.target.files?.[0])} />
+        </Field>
+      </div>
+      {/* Fallback that opens the phone's own camera app (works on http pages, where live camera is blocked). */}
+      <input ref={nativeCamera} type="file" accept="image/*" capture="user" hidden disabled={disabled} data-testid="photo-camera-input" onChange={(e) => pick(e.target.files?.[0])} />
+      <CameraCapture open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={accept} />
       {preview && (
         // eslint-disable-next-line @next/next/no-img-element
         <p><img src={preview} alt="Your photo preview" width={120} height={120} style={{ objectFit: "cover", borderRadius: "var(--radius)" }} /></p>

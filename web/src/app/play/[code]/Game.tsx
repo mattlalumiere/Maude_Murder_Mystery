@@ -6,6 +6,7 @@ import { SealedCard } from "./Envelope";
 import type { PlayerState } from "@/app/_views";
 import { MediaView } from "@/components/Media";
 import { RulesCard } from "@/components/RulesCard";
+import { TalkToGuests } from "@/components/TalkToGuests";
 import { Badge, Candle, Card, ConnectionCandle, ErrorNote, Fog, PaperClue, Skeleton } from "@/components/kit";
 import { credHeaders, friendlyError, plainText, sendAction, tilt, useDocTitle, useRoom, type BallotDraft, type Creds } from "@/lib/client";
 
@@ -61,6 +62,10 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
 
       {ch && !inLobby && (
         <SealedCard code={code} avatarId={me.avatarId} ch={ch} canReady={cardsPhase} ready={me.ready} busy={busy} onReady={() => act({ type: "ready" })} />
+      )}
+
+      {!inLobby && !cardsPhase && state.bots.length > 0 && (
+        <TalkToGuests code={code} creds={creds} bots={state.bots} log={state.botLog} adult={me.ageGroup === "adult"} voiceReplies={state.botConfig.voice} />
       )}
 
       {scenes.map((m) => <Card key={m.id} style={{ marginTop: "var(--space-3)" }}><MediaView code={code} m={m} /></Card>)}

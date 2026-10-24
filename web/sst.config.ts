@@ -37,6 +37,7 @@ export default $config({
         AUTH_SECRET: process.env.AUTH_SECRET ?? "",
         AUTH_TRUST_HOST: "true",
         ASYNC_START: "true",
+        CLOUD_PROVIDER: "aws",
         // CloudFront closes slow origin responses at 30 s by default. Raise that quota to 60 s, or keep this at 25 s so the sample case is used instead of a 504.
         GENERATION_DEADLINE_MS: process.env.GENERATION_DEADLINE_MS ?? "25000",
         // Photo likenesses for players under 18 are off unless you set this to "true" (needs a guardian-consent process).
@@ -53,6 +54,8 @@ export default $config({
       permissions: [
         { actions: ["bedrock:InvokeModel", "bedrock:Converse", "bedrock:InvokeModelWithResponseStream", "bedrock:StartAsyncInvoke", "bedrock:GetAsyncInvoke"], resources: ["*"] },
         { actions: ["rekognition:DetectModerationLabels"], resources: ["*"] },
+        // AI guests speak through Amazon Polly when CLOUD_PROVIDER=aws.
+        { actions: ["polly:SynthesizeSpeech"], resources: ["*"] },
       ],
     });
   },

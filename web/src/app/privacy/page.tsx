@@ -24,6 +24,9 @@ export default function Privacy() {
       <h2>Children</h2>
       <p>By default, photo likenesses are turned <b>off</b> for anyone under 18. If the host turns them on for the event, a parent or guardian must agree for each child. Children can always play with no photo and a cartoon character the GM invents.</p>
 
+      <h2>AI guests and voices</h2>
+      <p>The host can add AI guests. What you type to them is sent to the AI service the host has configured, along with their character card and the clues everyone has seen, and never other players&apos; secrets. When cloud voices are on, their replies are turned into speech by the host&apos;s cloud voice service. The &quot;Speak&quot; button, offered to grown-ups only, uses your browser&apos;s built-in speech recognition, which may send your voice to the browser&apos;s maker (for example Google or Apple). Children can type but not speak to the AI guests. Chat lines are kept only for the length of the game.</p>
+
       <h2>Who else sees your data</h2>
       <p>Your text and photo are sent to the AI and cloud services the host has configured for this game (for example AWS Bedrock, Rekognition, and S3) only to run the game. We do not sell data or use it to train models.</p>
 

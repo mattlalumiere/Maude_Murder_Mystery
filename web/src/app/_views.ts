@@ -1,13 +1,17 @@
 // Shapes of the three client views (hostView, playerView, publicView). Secret fields are never part of these.
+import type { BotLineView, BotView } from "@/lib/client";
 import type { BudgetState, CharacterCard, GameConfig } from "@/lib/types";
+
+export type BotCommon = { bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
 
 export type MediaItemView = { id: string; kind: string; phase: string; caption: string; mime?: string };
 
-export type HostState = {
+export type HostState = BotCommon & {
+  botQueued?: number;
   version: number; code: string; phase: string; phaseTitle: string; clock: string; paused: boolean; title?: string;
   narration?: string; overrideUsed: boolean; ballotsIn: number; totalPlayers: number; ballotsOpen: boolean;
   runSheet: { phase: string; title: string; clock: string }[];
-  players: { id: string; name: string; ageGroup: string; ready: boolean; hasDevice: boolean; ballot: boolean; characterName?: string; hasPhoto: boolean; backstory: string }[];
+  players: { id: string; name: string; isBot?: boolean; ageGroup: string; ready: boolean; hasDevice: boolean; ballot: boolean; characterName?: string; hasPhoto: boolean; backstory: string }[];
   clues: { id: string; text: string }[];
   reveal?: { killer?: string; scores: { name: string; points: number }[] };
   generating?: number | null; starting?: boolean; drinking?: "adults" | "none";
@@ -17,7 +21,7 @@ export type HostState = {
 
 export type Opt = { id: string; text?: string; name?: string; house?: string };
 
-export type PlayerState = {
+export type PlayerState = BotCommon & {
   version: number; phase: string; phaseTitle: string; paused: boolean; narration?: string; setting?: string; title?: string;
   starting?: boolean; drinking?: "adults" | "none";
   lobbyNames: string[]; clues: { id: string; text: string }[]; ballotsOpen: boolean;
@@ -32,7 +36,7 @@ export type PlayerState = {
   };
 };
 
-export type ScreenState = {
+export type ScreenState = BotCommon & {
   version: number; code: string; phase: string; phaseTitle: string; paused: boolean; narration?: string; title?: string; setting?: string;
   starting?: boolean; drinking?: "adults" | "none";
   lobbyNames: string[]; clues: { id: string; round: number; text: string }[];

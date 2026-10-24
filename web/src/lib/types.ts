@@ -144,12 +144,39 @@ export interface MediaItem {
   createdAt: number;
 }
 
+export interface BotProfile {
+  /** One-line persona the bot speaks in. */
+  style: string;
+  /** Voice id for the speech adapter in use. */
+  voice: string;
+}
+
+export interface BotLine {
+  id: string;
+  botId: string;
+  speaker: string;
+  text: string;
+  phase: Phase;
+  kind: "reply" | "chatter";
+  /** Name of the player this reply answers. */
+  to?: string;
+  audioKey?: string;
+  audioMime?: string;
+  ts: number;
+}
+
+export interface BotQueueItem { id: string; botId: string; phase: Phase }
+export interface BotConfig { chatter: boolean; voice: boolean }
+
 export interface Player {
   id: string;
   name: string;
   ageGroup: AgeGroup;
   wantsVictim: boolean;
   profile: PlayerProfile;
+  /** AI guest: has no device or photo, and speaks through the bot engine. */
+  isBot?: boolean;
+  bot?: BotProfile;
   token: string;
   characterId?: string;
   ready: boolean;
@@ -196,5 +223,10 @@ export interface Room {
   ballotsOpen: boolean;
   /** Set (epoch ms) while the host-triggered case generation is running; null/undefined otherwise. */
   generating?: number;
+  botLog?: BotLine[];
+  botQueue?: BotQueueItem[];
+  botConfig?: BotConfig;
+  botCooldown?: Record<string, number>;
+  botMessages?: number;
   result?: Result;
 }

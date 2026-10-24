@@ -110,3 +110,12 @@ Say "voice" at the start. The AI runs a spoken roll call, announces the cast wit
 - Portraits appear next to each character in the cast list and on each player's card.
 - The host console shows spend against your budget. Use it to raise or lower the number of scenes per act, add or remove video clips, switch quality, or pause AI media.
 - If the budget runs out, remaining pictures are skipped and the game carries on in text.
+
+## AI guests (bots)
+
+- In the lobby, the host can add **AI guests** (1 to 8). They count toward the 4-player minimum, are cast as grown-up characters, and may even be the killer. They never see other players' secrets.
+- During the game players open **Talk to the guests** on their phones to ask an AI guest where they were, what they saw, or what they are hiding. Grown-ups can tap **Speak** to talk instead of type; children type.
+- AI guests also chime in at story beats (the party, the death, the twist, the accusations), shown on the big screen. Tap **Enable voices** on the TV or a phone to hear them.
+- Voices: free browser voices by default. With `CLOUD_PROVIDER=aws` they use Amazon Polly, with `azure` Azure AI Speech. The host console shows which is active.
+- At the reveal the AI guests cast their own accusations, using only the public clues. They appear on the scoreboard but never win the human awards.
+- The host can mute chatter or cloud voices at any time from the AI guests card. Spending counts against your AI budget, and when it runs out the guests fall back to scripted replies and free browser voices.

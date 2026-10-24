@@ -30,6 +30,8 @@ Murder Mystery Night is a party game for mixed-age groups (10-20 adults aged 20-
 | `web/src/lib/media-gen.ts`, `media-store.ts` | Image/video/moderation providers (mock and Bedrock) and photo/art storage (local disk or S3) |
 | `web/src/lib/jpeg-strip.ts` | Removes EXIF/GPS and trailing payloads from uploaded JPEGs on the server |
 | `docs/RUNBOOK.md` | AWS (SST) deploy, dry run, party-day checklist, rollback |
+| `web/src/lib/bots.ts` | AI guests: prompts (own card plus public info only), scripted fallback, chat, story-beat chatter, spend reservation |
+| `web/src/lib/ai/speech*.ts` | Speech port and adapters (browser, mock, Polly, Azure, OpenAI-compatible), chosen by `SPEECH_ADAPTER` or `CLOUD_PROVIDER` |
 | `web/src/lib/sanitize.ts` | Input clamping for config, plan, and player profile |
 | `web/src/lib/gm-ai.ts` | Bedrock case generation with fallback to `sample-case.ts` |
 | `web/src/lib/sample-case.ts` | Built-in sample case ("The Last Toast at Gus Pennywhistle's 70th") |

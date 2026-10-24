@@ -3,6 +3,7 @@ import { RulesCard } from "@/components/RulesCard";
 import { use } from "react";
 import type { ScreenState } from "@/app/_views";
 import { Avatar, MediaView } from "@/components/Media";
+import { BotChatter } from "@/components/BotChatter";
 import { Qr } from "@/components/Qr";
 import { Badge, Candle, ConnectionCandle, ErrorNote, Fog, PaperClue, Skeleton } from "@/components/kit";
 import { groupByHouse, hostName, normalizeCode, originUrl, plainText, tilt, useDocTitle, useRoom, useTvSurface } from "@/lib/client";
@@ -68,6 +69,7 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
           {state.narration && <p className="sc-tv-narr" data-testid="tv-narration">{plainText(state.narration)}</p>}
           {(state.phase === "cards" || state.phase === "act1") && <RulesCard drinking={state.drinking} big />}
           {state.ballotsOpen && <p className="sc-tv-votes" data-testid="tv-ballots" role="status">Accusations in: {state.ballotsIn} of {state.totalPlayers}</p>}
+          <BotChatter code={code} lines={state.botLog} bots={state.bots} big />
           {hero && !state.reveal && <div className="sc-tv-hero" style={{ marginTop: "var(--space-4)" }}><MediaView code={code} m={hero} /></div>}
         </div>
 

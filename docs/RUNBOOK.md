@@ -60,6 +60,10 @@ Apple needs a paid Apple Developer account. Facebook needs app review for produc
 
 Fix anything that failed before inviting guests.
 
+## 4b. AI guest voices (optional)
+
+With `CLOUD_PROVIDER=aws` (set in `sst.config.ts`) AI guests speak through **Amazon Polly** (neural voices; the deploy role already gets `polly:SynthesizeSpeech`). Polly needs no model-access request, but confirm the neural voices exist in your region. Include one AI guest and one cloud-voiced reply in the dry run. Cost is small (roughly 16 USD per million characters, about a quarter of a cent per line). For Azure set `CLOUD_PROVIDER=azure`, `AZURE_SPEECH_KEY`, and `AZURE_SPEECH_REGION`.
+
 ## 5. Party-day checklist
 
 - [ ] Deploy at least a day ahead; re-run `/api/healthz`.

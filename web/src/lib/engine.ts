@@ -2,6 +2,8 @@ import { scryptSync, timingSafeEqual } from "node:crypto";
 import { LIMITS } from "./engine-limits";
 import { allocateJoinCode, getRuntime } from "./ids";
 import { fitPlan, recommend, TIERS } from "./budget";
+import { getSpeech } from "./ai/speech";
+import { BOT_LIMITS, BOT_PERSONAS, queueBotChatter } from "./bots";
 import { generateCase } from "./gm-ai";
 import { queueAvatars, queuePhaseMedia, reconcilePlan } from "./media-jobs";
 import { getMediaStore } from "./media-store";
@@ -126,7 +128,7 @@ function castPlayers(room: Room) {
   const young = room.players.filter((p) => p.ageGroup === "kid" || p.ageGroup === "teen");
   const victimPlayer =
     young.find((p) => p.wantsVictim) ?? young.find((p) => p.ageGroup === "kid") ?? young[0] ??
-    room.players.find((p) => p.wantsVictim && p.ageGroup === "adult") ?? shuffle(room.players.filter((p) => p.ageGroup === "adult"))[0];
+    room.players.find((p) => p.wantsVictim && p.ageGroup === "adult" && !p.isBot) ?? shuffle(room.players.filter((p) => p.ageGroup === "adult" && !p.isBot))[0];
   const victim = chars.find((c) => c.id === k.victimId)!;
   assign(victimPlayer, victim);
 
@@ -225,8 +227,9 @@ function setPhase(room: Room, phase: Phase) {
   if (phase === "act2") release(k.clues.filter((c) => c.round === 1).map((c) => c.id));
   if (phase === "act3") release([...k.clues.filter((c) => c.round === 2).map((c) => c.id), "twist"]);
   room.ballotsOpen = phase === "act4";
-  if (phase === "reveal") room.result = computeResult(room);
+  if (phase === "reveal") { fillBotBallots(room); room.result = computeResult(room); }
   queuePhaseMedia(room, phase);
+  queueBotChatter(room, phase);
 }
 
 export function advance(room: Room) {
@@ -268,16 +271,18 @@ function computeResult(room: Room): Result {
     return { playerId: p.id, name: p.name, points: pts, detail: d.join(", ") };
   }).sort((a, b) => b.points - a.points);
 
-  const nameOf = (pred: (p: Player) => boolean) => room.players.find(pred)?.name;
+  const isBotId = (id: string) => !!room.players.find((p) => p.id === id)?.isBot;
+  const nameOf = (pred: (p: Player) => boolean) => room.players.find((p) => !p.isBot && pred(p))?.name;
   const killerP = nameOf((p) => p.characterId === k.killerId);
   const victimP = nameOf((p) => p.characterId === k.victimId);
   const mascotP = room.players.find((p) => k.characters.find((c) => c.id === p.characterId)?.role === "mascot")?.name;
   const awards: Result["awards"] = [];
-  if (scores[0]) awards.push({ award: "Detective of the Night", to: scores[0].name });
+  const topHuman = scores.find((x) => !isBotId(x.playerId));
+  if (topHuman) awards.push({ award: "Detective of the Night", to: topHuman.name });
   if (killerP) awards.push({ award: "Best Liar", to: killerP });
   if (victimP) { awards.push({ award: "Most Dramatic Death", to: victimP }); awards.push({ award: "Ghost MVP", to: victimP }); }
   if (mascotP) awards.push({ award: "Mascot of Honor", to: mascotP });
-  const rest = shuffle(room.players.map((p) => p.name));
+  const rest = shuffle(room.players.filter((p) => !p.isBot).map((p) => p.name));
   if (rest[0]) awards.push({ award: "Best Entrance", to: rest[0] });
   return { killerId: k.killerId, methodId: k.truth.methodId, motiveId: k.truth.motiveId, story: k.truth.story, scores, awards };
 }
@@ -352,6 +357,12 @@ export function publicView(room: Room) {
     narration: k?.narration[room.phase],
     lobbyNames: room.players.map((p) => p.name),
     starting: !!room.generating,
+    bots: room.case
+      ? room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: room.case!.characters.find((c) => c.id === p.characterId)?.name ?? p.name, avatarId: p.profile.avatarId }))
+      : room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: p.name, avatarId: undefined })),
+    botLog: (room.botLog ?? []).slice(-25).map((l) => ({ id: l.id, botId: l.botId, speaker: l.speaker, text: l.text, kind: l.kind, to: l.to, phase: l.phase, audio: !!l.audioKey, ts: l.ts })),
+    botConfig: { chatter: room.botConfig?.chatter !== false, voice: room.botConfig?.voice !== false },
+    speech: getSpeech().kind,
     drinking: room.config.drinking,
     roster, clues,
     ballotsOpen: room.ballotsOpen,
@@ -391,13 +402,14 @@ export function hostView(room: Room) {
     lockedUntil: room.lockedUntil,
     config: room.config,
     generating: room.generating ?? null,
+    botQueued: (room.botQueue ?? []).length,
     caseSource: room.caseSource,
     budget: room.budget,
     jobs: room.media.slice(-60).map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, status: m.status, note: m.note, est: m.estCostUsd, caption: m.caption })),
     runSheet: PHASES.map((ph) => ({ phase: ph, ...PHASE_INFO[ph] })),
     players: room.players.map((p) => ({
       id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, hasDevice: p.hasDevice, ballot: !!p.ballot,
-      hasPhoto: !!p.profile.photoKey, backstory: p.profile.backstoryMode,
+      hasPhoto: !!p.profile.photoKey, backstory: p.profile.backstoryMode, isBot: !!p.isBot,
       characterName: k?.characters.find((c) => c.id === p.characterId)?.name,
     })),
   };
@@ -457,4 +469,61 @@ export function photosCanBePurged(room: Room) {
   if (room.media.some((m) => MEDIA_ACTIVE.has(m.status))) return false;
   const laterArt = room.budget.plan.scenesPerAct > 0 || room.budget.plan.videoClips > 0;
   return room.phase === "reveal" || !laterArt;
+}
+
+// ---------- AI guests (bots) ----------
+/** Adds AI guests to the lobby. They count toward the player minimums and are cast like grown-up players. */
+export function addBots(room: Room, count: number, styleHint?: string): Player[] {
+  if (room.phase !== "lobby") throw new HttpError(409, "The game has already started");
+  const have = room.players.filter((p) => p.isBot).length;
+  const n = Math.max(1, Math.min(Math.round(Number(count) || 1), BOT_LIMITS.maxBots - have));
+  if (have >= BOT_LIMITS.maxBots) throw new HttpError(409, `At most ${BOT_LIMITS.maxBots} AI guests`);
+  if (room.players.length + n > LIMITS.maxPlayers) throw new HttpError(409, "Room is full");
+  const voices = getSpeech().voices;
+  const added: Player[] = [];
+  for (let i = 0; i < n; i++) {
+    const idx = (have + i) % BOT_PERSONAS.length;
+    let name = `${BOT_PERSONAS[idx].name} (AI)`;
+    for (let k = 2; room.players.some((p) => p.name.toLowerCase() === name.toLowerCase()); k++) name = `${BOT_PERSONAS[idx].name} ${k} (AI)`;
+    const p: Player = {
+      id: rid(6), name, ageGroup: "adult", wantsVictim: false, token: rid(18), ready: true, hasDevice: false,
+      isBot: true, bot: { style: styleHint?.trim().slice(0, 120) || BOT_PERSONAS[idx].style, voice: voices[(have + i) % voices.length] },
+      profile: sanitizeProfile(undefined, false),
+    };
+    room.players.push(p);
+    added.push(p);
+  }
+  return added;
+}
+
+export function setBotConfig(room: Room, patch: { chatter?: boolean; voice?: boolean }) {
+  room.botConfig = { chatter: room.botConfig?.chatter !== false, voice: room.botConfig?.voice !== false };
+  if (typeof patch.chatter === "boolean") room.botConfig.chatter = patch.chatter;
+  if (typeof patch.voice === "boolean") room.botConfig.voice = patch.voice;
+  if (!room.botConfig.chatter) room.botQueue = [];
+}
+
+/**
+ * Bots vote at the reveal. Innocent bots reason from PUBLIC clues only (name and word overlap), never the solution.
+ * A killer bot knows the truth and avoids naming itself or the true method and motive.
+ */
+function fillBotBallots(room: Room) {
+  const k = room.case;
+  if (!k) return;
+  const suspects = suspectList(room);
+  if (!suspects.length) return;
+  const clues = [...k.clues, { id: "twist", round: 2 as const, text: k.twist }].filter((c) => room.releasedClueIds.includes(c.id)).map((c) => c.text.toLowerCase()).join(" ");
+  const jitter = () => getRuntime().random.int(100) / 100;
+  const overlap = (text: string) => text.toLowerCase().split(/\W+/).filter((w) => w.length > 4).reduce((n, w) => n + (clues.includes(w) ? 1 : 0), 0);
+  const best = <T,>(items: T[], score: (t: T) => number) => items.map((t) => ({ t, s: score(t) + jitter() })).sort((a, b) => b.s - a.s)[0]?.t;
+  for (const bot of room.players.filter((p) => p.isBot && !p.ballot)) {
+    const isKiller = bot.characterId === k.killerId;
+    const others = suspects.filter((c) => c.id !== bot.characterId);
+    const target = isKiller
+      ? shuffle(others)[0]
+      : best(others, (c) => clues.split(c.name.toLowerCase().split(" ")[0]).length - 1 + c.name.toLowerCase().split(" ").reduce((n, w) => n + (w.length > 3 && clues.includes(w) ? 1 : 0), 0));
+    const method = isKiller ? shuffle(k.methods.filter((m) => m.id !== k.truth.methodId))[0] : best(k.methods, (m) => overlap(m.text));
+    const motive = isKiller ? shuffle(k.motives.filter((m) => m.id !== k.truth.motiveId))[0] : best(k.motives, (m) => overlap(m.text));
+    if (target && method && motive) bot.ballot = { killerId: target.id, methodId: method.id, motiveId: motive.id };
+  }
 }

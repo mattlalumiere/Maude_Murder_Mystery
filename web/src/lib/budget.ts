@@ -10,6 +10,7 @@ export const PRICES = {
   videoSeconds: 6, // one clip
   moderationPerPhoto: 0.001, // Rekognition image moderation
   contingency: 0.15, // keep 15% of the budget unspent as a safety margin
+  botChat: 0.004, // one AI guest reply or chatter line (small text model call)
   gameTokenBudget: 150_000, // text tokens one game may spend (input plus output) through the AI gateway
 };
 
@@ -19,7 +20,7 @@ export type PricingProfile = "aws" | "local";
 /** Local models (and the mock image/moderation providers) cost nothing, but still flow through claim() and the token budget. */
 export const LOCAL_PRICES: Prices = {
   textPerGame: 0, imageStandard: 0, imagePremium: 0, videoPerSecond: 0, videoSeconds: PRICES.videoSeconds,
-  moderationPerPhoto: 0, contingency: PRICES.contingency, gameTokenBudget: 200_000,
+  moderationPerPhoto: 0, botChat: 0, contingency: PRICES.contingency, gameTokenBudget: 200_000,
 };
 
 export const pricesFor = (profile: PricingProfile): Prices => (profile === "local" ? LOCAL_PRICES : PRICES);

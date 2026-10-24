@@ -30,6 +30,12 @@ export const sendAction = <T = Record<string, unknown>>(code: string, body: obje
   api<T>(`/api/rooms/${code}/action`, body, headers);
 export const runMedia = (code: string) => api(`/api/rooms/${code}/media/run`, {});
 export const runGenerate = (code: string) => api(`/api/rooms/${code}/generate`, {});
+export type BotLineView = { id: string; botId: string; speaker: string; text: string; kind: "reply" | "chatter"; to?: string; phase: string; audio: boolean; ts: number };
+export type BotView = { id: string; name: string; characterName: string; avatarId?: string };
+export const chatWithBot = (code: string, botId: string, message: string, creds: Creds) =>
+  api<{ line: BotLineView }>(`/api/rooms/${code}/bots/${botId}/chat`, { message }, credHeaders(creds));
+export const runBotTick = (code: string) => api(`/api/rooms/${code}/bots/tick`, {});
+export const botAudioUrl = (code: string, id: string) => `/api/rooms/${code}/bots/audio/${id}`;
 export const mediaUrl = (code: string, id: string) => `/api/rooms/${code}/media/${id}`;
 
 export async function uploadPhotoBlob(code: string, creds: Creds, blob: Blob, consent: "self" | "guardian") {

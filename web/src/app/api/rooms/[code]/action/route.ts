@@ -1,6 +1,6 @@
 import { hostIdFromSession } from "@/auth";
 import { getTextModel } from "@/lib/ai/config";
-import { addPlayer, advance, authPlayer, beginGeneration, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
+import { addBots, addPlayer, advance, authPlayer, beginGeneration, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
 import { getStore, HttpError, mutate } from "@/lib/store";
 import type { AgeGroup, Ballot, MediaPlan } from "@/lib/types";
@@ -13,12 +13,14 @@ type Body =
   | { type: "kick"; playerId: string }
   | { type: "override"; code: string; cmd: OverrideCmd; confirm?: boolean }
   | { type: "setPlan"; plan?: Partial<MediaPlan>; capUsd?: number }
+  | { type: "addBots"; count: number; style?: string }
+  | { type: "setBotConfig"; chatter?: boolean; voice?: boolean }
   | { type: "purgePhotos" }
   | { type: "removePhoto" }
   | { type: "ready" }
   | { type: "ballot"; ballot: Ballot };
 
-const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos"]);
+const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos", "addBots", "setBotConfig"]);
 
 export async function POST(req: Request, ctx: { params: Promise<{ code: string }> }) {
   return handle(async () => {
@@ -54,6 +56,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
           catch (e) { if (e instanceof HttpError) deferredError = e as HttpError; else throw e; }
           break;
         case "setPlan": setPlan(room, body.plan, body.capUsd); break;
+        case "addBots": addBots(room, body.count, body.style); break;
+        case "setBotConfig": setBotConfig(room, body); break;
         case "purgePhotos": await purgePhotos(room); break;
         case "removePhoto": await removePhoto(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
         case "ready": authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")).ready = true; break;

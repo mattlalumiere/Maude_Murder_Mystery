@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { BotsPanel } from "./BotsPanel";
 import { BudgetPanel } from "./BudgetPanel";
 import type { HostState } from "@/app/_views";
 import { CopyButton } from "@/components/CopyButton";
 import { Qr } from "@/components/Qr";
 import { Badge, Button, Card, ConnectionCandle, ErrorNote, Field, Notice, Skeleton } from "@/components/kit";
-import { askConfirm, friendlyError, nextPhaseTitle, originUrl, phaseIndex, runGenerate, runMedia, sendAction, useDocTitle, useRoom } from "@/lib/client";
+import { askConfirm, friendlyError, nextPhaseTitle, originUrl, phaseIndex, runBotTick, runGenerate, runMedia, sendAction, useDocTitle, useRoom } from "@/lib/client";
 import type { AgeGroup } from "@/lib/types";
 
 export default function HostConsole({ code }: { code: string }) {
@@ -15,6 +16,7 @@ export default function HostConsole({ code }: { code: string }) {
   const [oc, setOc] = useState("");
   const [np, setNp] = useState({ name: "", ageGroup: "little" as AgeGroup });
   const [handoff, setHandoff] = useState("");
+  const [sampleLinks, setSampleLinks] = useState<{ name: string; url: string }[]>([]);
   const [capInput, setCapInput] = useState("");
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
@@ -35,6 +37,23 @@ export default function HostConsole({ code }: { code: string }) {
     const t = setInterval(() => { if (!stop) tick(); }, 4000);
     return () => { stop = true; clearInterval(t); };
   }, [pending, code, refresh]);
+
+  // AI guest chatter: nudge the server to speak queued story-beat lines, one at a time (spend is capped server-side).
+  const botPending = (state?.botQueued ?? 0) > 0 && !!state?.botConfig.chatter;
+  const botWorking = useRef(false);
+  useEffect(() => {
+    if (!botPending) return;
+    let stop = false;
+    const tick = async () => {
+      if (botWorking.current) return;
+      botWorking.current = true;
+      try { await runBotTick(code); await refresh(true); } catch { /* retried next tick */ }
+      botWorking.current = false;
+    };
+    tick();
+    const t = setInterval(() => { if (!stop) tick(); }, 3000);
+    return () => { stop = true; clearInterval(t); };
+  }, [botPending, code, refresh]);
 
   // Start is two steps: the server claims the room (fast), then this tab asks it to write the mystery (slow, up to ~50 s).
   const genRef = useRef<number | null>(null);
@@ -59,6 +78,18 @@ export default function HostConsole({ code }: { code: string }) {
     if (r?.message) setMsg(r.message);
     if (r?.needsConfirm && askConfirm(r.message ?? "Are you sure?")) await override(cmd, true);
   }
+  // Local testing helper: fills the lobby so one person can try the whole game. Hidden in production builds.
+  async function addSamples() {
+    const roster: [string, AgeGroup][] = [["Alex (test)", "adult"], ["Sam (test)", "adult"], ["Jordan (test)", "adult"], ["Riley (test)", "kid"], ["Pip (test)", "little"]];
+    const have = new Set(state?.players.map((p) => p.name) ?? []);
+    const links: { name: string; url: string }[] = [];
+    for (const [name, ageGroup] of roster) {
+      if (have.has(name)) continue;
+      const r = await act({ type: "addPlayer", name, ageGroup }) as { playerId?: string; token?: string } | undefined;
+      if (r?.playerId) links.push({ name, url: `${originUrl()}/play/${code}?pid=${r.playerId}&tok=${r.token}` });
+    }
+    setSampleLinks((prev) => [...prev, ...links]);
+  }
   async function add() {
     const r = await act({ type: "addPlayer", ...np }) as { playerId?: string; token?: string } | undefined;
     if (r?.playerId) setHandoff(`${originUrl()}/play/${code}?pid=${r.playerId}&tok=${r.token}`);
@@ -75,6 +106,12 @@ export default function HostConsole({ code }: { code: string }) {
     );
   }
   const lobby = state.phase === "lobby";
+  const adultCount = state.players.filter((p) => p.ageGroup === "adult").length;
+  const canStart = state.players.length >= 4 && adultCount >= 2;
+  const startNeeds = [
+    state.players.length < 4 ? `${4 - state.players.length} more player${4 - state.players.length === 1 ? "" : "s"}` : "",
+    adultCount < 2 ? `${2 - adultCount} more grown-up${2 - adultCount === 1 ? "" : "s"}` : "",
+  ].filter(Boolean).join(" and ");
   const joinUrl = `${originUrl()}/join/${code}`;
   const last = state.phase === "reveal";
   const notice = state.aiDegraded
@@ -103,13 +140,29 @@ export default function HostConsole({ code }: { code: string }) {
         {!lobby && state.narration && <p>{state.narration}</p>}
         {lobby ? (
           <>
-            <p className="muted">Needs at least 4 players and 2 grown-ups. {state.players.length} so far.</p>
+            <p className="muted">Needs at least 4 players, 2 of them grown-ups. The host runs the game and is not counted unless you also join with the invite link.</p>
+            {!canStart && (
+              <Notice data-testid="host-start-needs">
+                Start is waiting for {startNeeds}. {state.players.length} joined so far ({adultCount} grown-up{adultCount === 1 ? "" : "s"}). Share the invite link or QR code below.
+              </Notice>
+            )}
             {state.generating && Date.now() - state.generating < 80_000 ? (
               <Notice data-testid="host-writing">The Game Master is writing your mystery and casting everyone. This can take up to a minute. Keep this tab open.</Notice>
             ) : (
-              <Button size="lg" block loading={busy} disabled={state.players.length < 4} onClick={() => act({ type: "start" })} data-testid="host-start">
-                {state.generating ? "That took too long. Start again" : "Cast the characters and start"}
+              <Button size="lg" block loading={busy} disabled={!canStart} onClick={() => act({ type: "start" })} data-testid="host-start">
+                {state.generating ? "That took too long. Start again" : canStart ? "Cast the characters and start" : "Waiting for players..."}
               </Button>
+            )}
+            {process.env.NODE_ENV !== "production" && (
+              <div className="sc-panel__body" data-testid="host-dev-tools" style={{ marginTop: "var(--space-3)" }}>
+                <p className="muted" style={{ marginTop: 0 }}>Local testing: fill the lobby with sample players so you can try the whole game alone.</p>
+                <Button variant="secondary" disabled={busy} onClick={addSamples} data-testid="host-add-samples">Add 5 sample players</Button>
+                {sampleLinks.length > 0 && (
+                  <ul className="clean" data-testid="host-sample-links">
+                    {sampleLinks.map((l) => <li key={l.name}><a href={l.url} target="_blank" rel="noopener">Open as {l.name}</a></li>)}
+                  </ul>
+                )}
+              </div>
             )}
           </>
         ) : (
@@ -124,6 +177,8 @@ export default function HostConsole({ code }: { code: string }) {
           </>
         )}
       </Card>
+
+      <BotsPanel state={state} act={act} busy={busy} />
 
       <Card title="Invite players" style={{ marginTop: "var(--space-3)" }} data-testid="host-invite">
         <div className="sc-invite">
