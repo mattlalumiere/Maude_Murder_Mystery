@@ -147,8 +147,8 @@ export default function HostConsole({ code }: { code: string }) {
                 Start is waiting for {startNeeds}. {state.players.length} joined so far ({adultCount} grown-up{adultCount === 1 ? "" : "s"}). Share the invite link or QR code below.
               </Notice>
             )}
-            {state.generating && Date.now() - state.generating < 80_000 ? (
-              <Notice data-testid="host-writing">The Game Master is writing your mystery and casting everyone. This can take up to a minute. Keep this tab open.</Notice>
+            {state.generating && Date.now() - state.generating < (state.generationWindowMs ?? 80_000) ? (
+              <Notice data-testid="host-writing">The Game Master is writing your mystery and casting everyone. {state.localAi ? "On a local model this can take several minutes." : "This can take up to a minute."} Keep this tab open.</Notice>
             ) : (
               <Button size="lg" block loading={busy} disabled={!canStart} onClick={() => act({ type: "start" })} data-testid="host-start">
                 {state.generating ? "That took too long. Start again" : canStart ? "Cast the characters and start" : "Waiting for players..."}

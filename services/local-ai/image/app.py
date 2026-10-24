@@ -73,7 +73,8 @@ def _real(r: Req) -> Image.Image:
     if "t2i" not in _pipes:
         device = "cuda" if torch.cuda.is_available() else ("mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu")
         dtype = torch.float16 if device != "cpu" else torch.float32
-        t2i = AutoPipelineForText2Image.from_pretrained(MODEL_ID, torch_dtype=dtype).to(device)
+        t2i = AutoPipelineForText2Image.from_pretrained(MODEL_ID, torch_dtype=dtype, variant="fp16" if dtype == torch.float16 else None).to(device)
+        t2i.enable_attention_slicing()  # lower peak memory: the language model shares this machine's memory
         _pipes.update(t2i=t2i, i2i=AutoPipelineForImage2Image.from_pipe(t2i), device=device)
     gen = None
     if r.seed is not None:

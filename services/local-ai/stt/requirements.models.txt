@@ -1,1 +1,3 @@
 faster-whisper
+# faster-whisper 1.2 passes an argument that PyAV 17+ removed
+av>=14,<17

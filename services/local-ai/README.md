@@ -32,6 +32,19 @@ LOCAL_AI_MCP_URL=http://127.0.0.1:8765/mcp
 
 If the web app itself runs in a container, use `http://host.docker.internal:8765/mcp`, start the AI containers with `AI_BIND=0.0.0.0`, and set `LOCAL_AI_TOKEN`.
 
+## Real models on an Apple Silicon Mac (verified on an M4, 24 GB)
+
+```bash
+cd services/local-ai
+./dev.sh models                 # one time: torch, diffusers, piper, faster-whisper (about 1 GB)
+./start-real.sh                 # or: make local-ai-real   (chat uses the mlx_lm server on :8080)
+.venv/bin/python tests/warm.py  # one time: fetches the 8 voices and the diffusion model, then checks every tool
+```
+
+Measured on that machine: voices about 3 s per line, speech-to-text about 1 s per clip with exact results on test speech, text-to-image about 25 s the first time then a few seconds, photo-to-character about 4 s, a 6 second video about 1 s.
+
+**Memory is the limit on 24 GB.** The 30B chat model uses about 17 GB, so diffusion, speech, and the OS push the machine into swap and the first chat reply after a quiet spell can take over a minute while the model pages back in (later replies take about a second). For a smoother party, serve a smaller chat model (for example a 3B or 8B 4-bit model) and set `LLM_MODEL`. Do not load two models into the shared mlx server at once: on 24 GB that crashed it with a Metal out-of-memory error.
+
 ## MCP tools
 
 | Tool | Does | Backend |

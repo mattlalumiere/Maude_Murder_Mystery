@@ -282,7 +282,8 @@ export function repairCase(input: unknown): RepairResult {
       if (!ID_RE.test(id) || id === "twist") { id = uniqueId(`clue-${i + 1}`, used); fix(`clues[${i}].id: generated "${id}"`); }
       else if (used.has(id)) { const u = id; id = uniqueId(id, used); fix(`clues[${i}].id: duplicate "${u}" renamed "${id}"`); }
       else used.add(id);
-      const round = cl.round === 1 || cl.round === "1" ? 1 : cl.round === 2 || cl.round === "2" ? 2 : cl.round;
+      // Models sometimes number clues 1..N. Anything outside 1 or 2 is placed by position: first half round 1, second half round 2.
+      const round = cl.round === 1 || cl.round === "1" ? 1 : cl.round === 2 || cl.round === "2" ? 2 : (i < input.clues.length / 2 ? 1 : 2);
       if (round !== cl.round) fix(`clues[${i}].round: coerced to number`);
       return { id, round, text: str(`clues[${i}].text`, cl.text, LIMITS.caseText) };
     });

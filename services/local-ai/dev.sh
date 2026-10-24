@@ -6,6 +6,8 @@ cd "$(dirname "$0")"
 RUN=.run; VENV=.venv
 SERVICES=("tts:8766" "stt:8767" "image:8768" "video:8769")
 mkdir -p "$RUN"
+export PIPER_DATA="${PIPER_DATA:-$PWD/.models/piper}"   # voices downloaded on first use (native runs)
+mkdir -p "$PIPER_DATA"
 
 venv() {
   [ -x "$VENV/bin/python" ] || uv venv --python 3.12 "$VENV" >/dev/null

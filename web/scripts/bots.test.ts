@@ -65,6 +65,18 @@ async function main() {
   assert.ok(rep.length > 10);
   assert.ok(scriptedReply(room, bots[0], "are you a robot?").toLowerCase().includes("ai guest"), "admits being AI when asked");
   assert.ok(scriptedChatter(room, bots[0], "death").length > 10);
+  // Private notes on a card (the killer's "(This is false: ...)") are never spoken aloud, by script or by prompt "what you say".
+  const killerBot = structuredClone(room);
+  killerBot.case!.killerId = bots[0].characterId!;
+  const kc = killerBot.case!.characters.find((c) => c.id === bots[0].characterId)!;
+  kc.card.alibi = "You say you were watering tomatoes with Frank from 7:30 to 8:00. (This is false: Frank was napping.)";
+  for (const msg of ["where were you?", "what is your alibi"]) {
+    const said = scriptedReply(killerBot, bots[0], msg);
+    assert.ok(!/false|napping|\(|\)/i.test(said), `scripted reply leaks a private note: ${said}`);
+    assert.ok(said.includes("I was watering tomatoes"), said);
+  }
+  assert.ok(!/false|napping/i.test(scriptedChatter(killerBot, bots[0], "act2")), "scripted chatter never speaks private notes");
+  assert.ok(!buildBotPrompt(killerBot, bots[0], { kind: "reply", asker: "Hana", message: "hi" }).system.includes("This is false"), "model prompt gets the spoken alibi only");
 
   // ---- chat flow, gating, cooldown
   const asker = room.players.find((p) => p.name === "Hana")!;

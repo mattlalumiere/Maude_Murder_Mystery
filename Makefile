@@ -2,7 +2,7 @@
 # PROFILE=s3,pg,loadtest adds optional services:  make up PROFILE=s3
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
-.PHONY: help doctor up down logs ps test test-e2e test-scale clean seed ai-check local-ai-up local-ai-down local-ai-dev local-ai-test
+.PHONY: help doctor up down logs ps test test-e2e test-scale clean seed ai-check local-ai-up local-ai-down local-ai-dev local-ai-test local-ai-real
 
 help: ## list targets
 	@grep -hE '^[a-z0-9-]+:.*##' $(MAKEFILE_LIST) | sed -E 's/:.*## /\t/' | column -t -s $$'\t'
@@ -51,3 +51,6 @@ local-ai-dev: ## run the local AI services natively in mock mode (no containers)
 
 local-ai-test: ## end-to-end check of the local AI services through MCP
 	services/local-ai/dev.sh status && services/local-ai/.venv/bin/python services/local-ai/tests/smoke.py
+
+local-ai-real: ## run the local AI services natively with REAL models (see services/local-ai/README.md)
+	services/local-ai/start-real.sh

@@ -1,6 +1,7 @@
 // AI guests: bots that hold a character card, chat with players, chime in at story beats, and speak aloud.
 // Secrecy rule: a bot's prompt is built from its OWN card plus PUBLIC information only. Only a killer bot knows the solution.
 import { randomBytes } from "node:crypto";
+import { usesLocal } from "./ai/mode";
 import { pricesForRoom, speechFor, textModelFor } from "./ai/route";
 import type { TextModel } from "./ai/ports";
 import type { SpeechModel } from "./ai/speech-port";
@@ -30,7 +31,7 @@ export const botCharacter = (room: Room, bot: Player): Character | undefined => 
 
 /** Cleans model or player text: no control characters, markdown, or run-on length. Returns null if unusable or unsafe. */
 export function cleanLine(text: string, max = BOT_LIMITS.maxLineChars): string | null {
-  let t = String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim();
+  let t = String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, "").replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim();
   t = t.replace(/^["'“]+|["'”]+$/g, "").trim();
   if (!t || BLOCK.test(t)) return null;
   if (t.length > max) {
@@ -57,7 +58,7 @@ export function buildBotPrompt(room: Room, bot: Player, mode: { kind: "reply"; a
     `Everyone in the room can hear you, including young children. Keep it family friendly: PG, no innuendo, no gore, no pressing anyone to drink.`,
     `Reply in character in ONE to THREE short sentences, under ${BOT_LIMITS.maxLineChars} characters. Plain speech only: no stage directions, no emojis, no lists.`,
     `Your story: ${c.card.story}`,
-    `Your alibi: ${c.card.alibi}`,
+    `Your alibi (what you tell people): ${publicAlibi(c.card)}`,
     `What you know: ${c.card.knows.join(" ")}`,
     victim ? `The victim is ${victim.name}.` : "",
     clues.length ? `Clues everyone has seen so far: ${clues.join(" | ")}` : "No clues have been shown yet.",
@@ -72,6 +73,19 @@ export function buildBotPrompt(room: Room, bot: Player, mode: { kind: "reply"; a
   return { system, user };
 }
 
+/**
+ * The alibi as the character would say it aloud. Cards can carry private notes in parentheses
+ * (for example "(This is false: ...)" on the killer's card), which must never be spoken.
+ */
+export function publicAlibi(card: { alibi: string }): string {
+  return card.alibi
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/^\s*You say (that )?you (were|was)\s*/i, "I was ")
+    .replace(/^\s*You (were|was)\s*/i, "I was ")
+    .replace(/\byour\b/gi, "my").replace(/\byou\b/gi, "I")
+    .replace(/\s+/g, " ").replace(/\s+([.,;])/g, "$1").replace(/[.\s]+$/, "").trim();
+}
+
 const pick = <T,>(a: T[], seed: string) => a[[...seed].reduce((n, ch) => n + ch.charCodeAt(0), 0) % a.length];
 
 /** Rule-based reply used when no AI model is configured, the budget is spent, or the model fails. */
@@ -82,7 +96,7 @@ export function scriptedReply(room: Room, bot: Player, message: string): string 
   const m = message.toLowerCase();
   const victim = k.characters.find((x) => x.id === k.victimId)?.name ?? "the poor host";
   if (/\bai\b|robot|bot\b|human|real person/.test(m)) return `Guilty as charged, I am the party's AI guest. But ${c.name} is a character with real opinions, so ask away.`;
-  if (/where|alibi|were you|at the time/.test(m)) return `${c.card.alibi.replace(/\.$/, "")}. That is my story and I am sticking to it.`;
+  if (/where|alibi|were you|at the time/.test(m)) return `${publicAlibi(c.card)}. That is my story and I am sticking to it.`;
   if (/secret|hiding|hide|embarrass/.test(m)) return isKiller ? "Secrets? Darling, the only secret here is how dull my evening has been." : pick(["A lady never tells, and neither do I.", "Everyone has something silly to hide. Mine stays hidden, thank you.", "I have a little secret, but it has nothing to do with the crime. I promise."], c.id + m);
   if (/who|killer|did it|suspect|guilty|murder/.test(m)) {
     const hint = c.card.knows[0];
@@ -104,7 +118,7 @@ export function scriptedChatter(room: Room, bot: Player, phase: Phase): string {
   const lines: Partial<Record<Phase, string>> = {
     act1: `Good evening, everyone! ${c.name} here, delighted to be at ${victim}'s party and slightly suspicious of everybody.`,
     death: `Oh no! ${victim}! That is simply dreadful. I saw nothing. Absolutely nothing.`,
-    act2: `Let us compare alibis, shall we? Mine is simple: ${c.card.alibi.replace(/\.$/, "").toLowerCase()}.`,
+    act2: `Let us compare alibis, shall we? Mine is simple: ${publicAlibi(c.card)}.`,
     act3: `A twist! My nerves can hardly take it. Somebody in this room is fibbing.`,
     act4: `I have my suspicions, and I will keep them close until the ballots are in.`,
     reveal: `Well played, detectives! Whoever it was, what a marvelous party.`,
@@ -176,7 +190,7 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
   let usedModel = false;
   if (turn.useModel) {
     try {
-      const r = await turn.text!.generate({ system: prompt.system, user: prompt.user, maxOutputTokens: 160, temperature: 0.9, timeoutMs: 15_000, gameId: code });
+      const r = await turn.text!.generate({ system: prompt.system, user: prompt.user, maxOutputTokens: 100, temperature: 0.9, timeoutMs: usesLocal(turn.room) ? 60_000 : 15_000, gameId: code });
       text = cleanLine(r.text);
       usedModel = !!text;
     } catch { /* falls back to the scripted line */ }

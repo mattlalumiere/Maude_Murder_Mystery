@@ -4,7 +4,7 @@ Tools: health, list_voices, speak, transcribe, chat, stylize_photo, generate_ima
 Transport: streamable HTTP at /mcp (stateless, JSON responses). Optional bearer token via LOCAL_AI_TOKEN.
 Keep this port off the public internet: it is meant for the host machine or a private network.
 """
-import base64, hmac, os
+import asyncio, base64, hmac, os
 from typing import Optional
 
 import httpx
@@ -97,17 +97,37 @@ async def transcribe(audio_b64: str, mime: str = "audio/webm") -> dict:
         return r.json()
 
 
+_keepalive_task = None
+
+
+async def _keepalive() -> None:
+    """Touch the language model now and then so a big model stays in memory instead of being paged out (24 GB machines)."""
+    every = float(os.getenv("LLM_KEEPALIVE_S", "240"))
+    headers = {"Authorization": f"Bearer {LLM_KEY}"} if LLM_KEY else {}
+    while every > 0:
+        await asyncio.sleep(every)
+        try:
+            async with _client(300) as c:
+                await c.post(f"{LLM_BASE}/chat/completions", headers=headers,
+                             json={"model": LLM_MODEL, "messages": [{"role": "user", "content": "ok"}], "max_tokens": 1})
+        except Exception:  # noqa: BLE001
+            pass
+
+
 @mcp.tool()
 async def chat(user: str, system: str = "", max_tokens: int = 200, temperature: float = 0.8) -> dict:
     """One chat completion from the local language model. Returns {text, model}."""
     if len(user) > 12000 or len(system) > 12000:
         raise ValueError("prompt too long")
-    max_tokens = max(16, min(int(max_tokens), 4096))
+    max_tokens = max(16, min(int(max_tokens), 12000))
     if CHAT_MODE == "mock":
         return {"text": f"(local mock) {user.strip().splitlines()[-1][:160]}", "model": "mock"}
+    global _keepalive_task
+    if _keepalive_task is None:
+        _keepalive_task = asyncio.create_task(_keepalive())
     headers = {"Authorization": f"Bearer {LLM_KEY}"} if LLM_KEY else {}
     msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": user}]
-    async with _client(120) as c:
+    async with _client(900) as c:  # a whole mystery can take minutes on a laptop-sized model
         r = await c.post(f"{LLM_BASE}/chat/completions", headers=headers,
                          json={"model": LLM_MODEL, "messages": msgs, "max_tokens": max_tokens, "temperature": temperature})
         r.raise_for_status()

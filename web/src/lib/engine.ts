@@ -19,11 +19,17 @@ import {
 
 const DAY = 24 * 3600;
 /** A generation claim older than this is treated as abandoned (the request died), so the host can retry. */
-export const GENERATION_LOCK_MS = 90_000;
+export const GENERATION_LOCK_MS = 90_000; // minimum; the real window is generationLockMs()
 /** The case must be ready by then or the built-in sample case is used, so a 60 s Lambda never times out. */
 export const GENERATION_DEADLINE_MS = 50_000;
 /** Deployments behind a 30 s proxy timeout (the CloudFront default) set GENERATION_DEADLINE_MS=25000. */
-export const generationDeadlineMs = () => Math.min(GENERATION_DEADLINE_MS, Math.max(5_000, Number(process.env.GENERATION_DEADLINE_MS) || GENERATION_DEADLINE_MS));
+// An explicit GENERATION_DEADLINE_MS is honoured up to 15 minutes (self-hosted with a slow local model). Without it the 50 s serverless default applies.
+export const generationDeadlineMs = () => {
+  const asked = Number(process.env.GENERATION_DEADLINE_MS);
+  return Number.isFinite(asked) && asked > 0 ? Math.min(900_000, Math.max(5_000, asked)) : GENERATION_DEADLINE_MS;
+};
+/** How long a "being written" claim stays valid: the deadline plus slack, never less than 90 s. */
+export const generationLockMs = () => Math.max(GENERATION_LOCK_MS, generationDeadlineMs() + 30_000);
 
 const hashCode = (code: string, salt: string) => scryptSync(code.trim().toLowerCase().slice(0, LIMITS.overrideCodeMax), salt, 32).toString("hex");
 const safeEqual = (a: string, b: string) => {
@@ -86,7 +92,7 @@ export async function createRoom(
 
 export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>, characterChoice?: string): Player {
   if (room.phase !== "lobby") throw new HttpError(409, "The game has already started");
-  if (room.generating && now() - room.generating < GENERATION_LOCK_MS) throw new HttpError(409, "The host is starting the game. Please wait a moment.");
+  if (room.generating && now() - room.generating < generationLockMs()) throw new HttpError(409, "The host is starting the game. Please wait a moment.");
   const clean = String(name ?? "").trim().slice(0, LIMITS.playerName);
   if (!clean) throw new HttpError(400, "Name required");
   if (!["little", "kid", "teen", "adult"].includes(ageGroup)) throw new HttpError(400, "Bad age group");
@@ -229,7 +235,7 @@ export function beginGeneration(room: Room) {
   if (room.phase !== "lobby") throw new HttpError(409, "Already started");
   if (room.players.length < LIMITS.minPlayers) throw new HttpError(400, `Need at least ${LIMITS.minPlayers} players`);
   if (room.players.filter((p) => p.ageGroup === "adult").length < LIMITS.minAdults) throw new HttpError(400, `Need at least ${LIMITS.minAdults} adults`);
-  if (room.generating && now() - room.generating < GENERATION_LOCK_MS) throw new HttpError(409, "Your mystery is already being written");
+  if (room.generating && now() - room.generating < generationLockMs()) throw new HttpError(409, "Your mystery is already being written");
   room.generating = now();
 }
 
@@ -441,6 +447,7 @@ export function hostView(room: Room) {
     lockedUntil: room.lockedUntil,
     config: room.config,
     generating: room.generating ?? null,
+    generationWindowMs: generationLockMs() - 10_000,
     botQueued: (room.botQueue ?? []).length,
     caseSource: room.caseSource,
     aiMode: room.config.aiMode ?? "auto",

@@ -1,5 +1,5 @@
 """Local text-to-speech service (Piper). AI_MODE=mock returns short tones so the pipeline runs without voice models."""
-import io, math, os, struct, subprocess, tempfile, wave
+import io, math, os, struct, subprocess, sys, tempfile, wave
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Response
@@ -42,7 +42,7 @@ def _real_wav(text: str, voice: str) -> bytes:
     DATA.mkdir(parents=True, exist_ok=True)
     onnx = DATA / f"{voice}.onnx"
     if not onnx.exists():  # first use: fetch the voice (needs network once)
-        subprocess.run(["python", "-m", "piper.download_voices", voice, "--data-dir", str(DATA)], check=True, timeout=300)
+        subprocess.run([sys.executable, "-m", "piper.download_voices", voice, "--data-dir", str(DATA)], check=True, timeout=300)
     if voice not in _loaded:
         _loaded[voice] = PiperVoice.load(str(onnx))
     buf = io.BytesIO()
