@@ -13,6 +13,16 @@ const getSR = (): (new () => SR) | null => {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 };
 
+/** Says what actually went wrong instead of one generic "blocked" message. */
+export function micProblem(e: unknown): string {
+  if (typeof window !== "undefined" && !window.isSecureContext) return "Microphones only work on a secure page. Open this game at http://localhost:3000 on this computer, or over https on a phone.";
+  if (typeof navigator !== "undefined" && !navigator.mediaDevices?.getUserMedia) return "This browser cannot use a microphone here. Try Chrome or Safari, or type instead.";
+  const name = (e as { name?: string })?.name ?? "";
+  if (name === "NotFoundError" || name === "OverconstrainedError") return "No microphone was found on this device. Type instead.";
+  if (name === "NotReadableError" || name === "AbortError") return "The microphone is busy in another app. Close it and try again.";
+  return "This browser did not allow the microphone. If you are inside an app's built-in browser (like the Claude app's preview pane), open the game in Chrome or Safari instead, then allow the microphone when asked.";
+}
+
 export type CallState = "off" | "listening" | "thinking" | "speaking";
 
 interface Opts {
@@ -80,7 +90,10 @@ export function useCall({ code, creds, stt, onHeard, speaking, interrupt, headph
         if (res.isFinal) void say(text);
       }
     };
-    r.onerror = (e) => { if (e.error === "not-allowed" || e.error === "service-not-allowed") { setError("Microphone access was blocked. Allow it in your browser settings."); stopAll(); } };
+    r.onerror = (e) => {
+      if (e.error === "service-not-allowed" || e.error === "network") { setError("This browser's speech recognition is not available here. Try Chrome or Safari, or type instead."); stopAll(); }
+      else if (e.error === "not-allowed") { setError(micProblem(e)); stopAll(); }
+    };
     r.onend = () => { if (active.current) { try { r.start(); } catch { /* already running */ } } };  // browsers end sessions on silence; keep the line open
     r.start();
   }, [say, stopAll]);
@@ -128,8 +141,14 @@ export function useCall({ code, creds, stt, onHeard, speaking, interrupt, headph
     setError("");
     if (active.current) return;
     active.current = true; setState("listening");
-    try { if (stt === "browser") startBrowser(); else await startServer(); }
-    catch { setError("Microphone access was blocked. Allow it in your browser settings, or type instead."); stopAll(); }
+    try {
+      if (stt === "browser") {
+        // Ask for the microphone ourselves first, so the browser shows its permission prompt and a refusal is explained.
+        if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) throw new Error("insecure");
+        (await navigator.mediaDevices.getUserMedia({ audio: true })).getTracks().forEach((t) => t.stop());
+        if (active.current) startBrowser();
+      } else await startServer();
+    } catch (e) { setError(micProblem(e)); stopAll(); }
   }, [stt, startBrowser, startServer, stopAll]);
 
   useEffect(() => { if (state !== "off" && !busy.current) setState(speaking ? "speaking" : "listening"); }, [speaking, state]);

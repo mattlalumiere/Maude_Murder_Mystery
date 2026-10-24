@@ -58,7 +58,7 @@ export async function generateImage(r: ImageRequest, provider?: Provider): Promi
         taskType: "IMAGE_VARIATION",
         imageVariationParams: {
           text, negativeText: "text, watermark, gore, blood, nudity, scary, realistic violence",
-          images: r.refs.slice(0, 5).map((b) => b.toString("base64")), similarityStrength: 0.65,
+          images: r.refs.slice(0, 5).map((b) => b.toString("base64")), similarityStrength: 0.45,
         },
         imageGenerationConfig: { numberOfImages: 1, quality: r.quality, cfgScale: 7 },
       }

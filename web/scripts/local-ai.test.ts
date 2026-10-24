@@ -70,7 +70,7 @@ async function main() {
     assert.equal(avatar.mime, "image/png", "real diffusion path, not the SVG placeholder");
     const meta = pngText((await getMediaStore().get(avatar.key!))!.bytes);
     assert.equal(meta.had_reference, "1", "the uploaded photo reached the diffusion model");
-    assert.equal(meta.strength, "0.6");
+    assert.equal(meta.strength, "0.8");
     assert.ok(!meta.prompt.includes(ch.name), "no player names reach the image model");
     assert.ok(ch.title && meta.prompt.includes(ch.title), "prompt is written for this character's occupation");
     assert.ok(meta.prompt.toLowerCase().includes(room.case!.setting.split(" ")[0].toLowerCase()) || meta.prompt.includes("Pennywhistle"), "prompt carries the story setting");

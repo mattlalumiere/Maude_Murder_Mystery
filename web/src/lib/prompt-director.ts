@@ -9,7 +9,13 @@ import type { Character, MediaItem, Room } from "./types";
 export interface DirectedPrompt { prompt: string; negative: string; strength: number; source: "template" | "model" }
 
 export const NEGATIVE_PROMPT =
-  "text, letters, watermark, signature, gore, blood, nudity, weapons, scary, horror, deformed hands, extra fingers, distorted face, low quality";
+  "photo, photograph, photorealistic, realistic skin, 3d render, text, letters, watermark, signature, gore, blood, nudity, weapons, scary, horror, deformed hands, extra fingers, distorted face, low quality";
+
+/** Front-loaded style words (diffusion text encoders weigh the first tokens most). */
+export const CARTOON = "2D cartoon caricature illustration, flat colors, bold black outlines, cel shaded, exaggerated features, big expressive eyes, not a photo.";
+
+/** The same look in about 15 tokens, for prompts where the subject has to come first. */
+export const CARTOON_SHORT = "2D cartoon caricature, flat colors, bold outlines, cel shaded";
 
 const firstSentences = (s: string, n: number) => (s.match(/[^.!?]+[.!?]+/g) ?? [s]).slice(0, n).join(" ").trim().slice(0, 360);
 
@@ -42,14 +48,14 @@ export function templatePrompt(room: Room, job: Pick<MediaItem, "kind" | "phase"
     const who = c ? `a ${c.title}: ${c.look}` : "a party guest";
     const age = c?.kid ? "a child" : "an adult";
     return {
-      prompt: `Cartoon storybook portrait of ${who}. ${age}. Head and shoulders, friendly expression, warm lighting. Clothing and props that suit a character from the ${c?.house ?? "household"} in this story: ${f.setting}${keep} Family-friendly illustration.`.slice(0, 900),
-      negative: NEGATIVE_PROMPT, strength: withPhoto ? 0.6 : 1, source: "template",
+      prompt: `${CARTOON} Head and shoulders portrait of ${who}. ${age}. Friendly exaggerated expression. Clothing and props that suit a character from the ${c?.house ?? "household"} in this story: ${f.setting}${keep} Family-friendly illustration.`.slice(0, 900),
+      negative: NEGATIVE_PROMPT, strength: withPhoto ? 0.8 : 1, source: "template",
     };
   }
   const people = f.cast.map((c) => `a ${c.title} (${c.look})`).join("; ");
   return {
-    prompt: `Cartoon storybook scene for a family murder mystery comedy. ${f.setting} Moment: ${f.moment}${people ? ` Featuring ${people}.` : ""}${keep} Warm cinematic lighting, expressive faces, no text. Family-friendly.`.slice(0, 900),
-    negative: NEGATIVE_PROMPT, strength: withPhoto ? 0.72 : 1, source: "template",
+    prompt: `${CARTOON} Scene for a family murder mystery comedy. ${f.setting} Moment: ${f.moment}${people ? ` Featuring ${people}.` : ""}${keep} Warm cinematic lighting, expressive faces, no text. Family-friendly.`.slice(0, 900),
+    negative: NEGATIVE_PROMPT, strength: withPhoto ? 0.8 : 1, source: "template",
   };
 }
 
@@ -72,7 +78,7 @@ export async function directPrompt(room: Room, job: Pick<MediaItem, "kind" | "ph
     const r = await model.generate({ system: SYSTEM, user, maxOutputTokens: 140, temperature: 0.7, timeoutMs: 20_000 });
     const text = cleanLine(r.text, 420);
     // Only accept a plain descriptive line: JSON, braces or quotes mean the model echoed data instead of writing a prompt.
-    if (text && text.split(/\s+/).length >= 6 && !/[{}\[\]"]/.test(text)) return { ...base, prompt: `${text} Family-friendly cartoon illustration, no text.`.slice(0, 900), source: "model" };
+    if (text && text.split(/\s+/).length >= 6 && !/[{}\[\]"]/.test(text)) return { ...base, prompt: `${CARTOON} ${text} Family-friendly, no text.`.slice(0, 900), source: "model" };
   } catch { /* the template is good enough */ }
   return base;
 }

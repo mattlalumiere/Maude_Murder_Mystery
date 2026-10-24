@@ -71,6 +71,7 @@ async function main() {
   const job = room.media.find((m) => m.kind === "selfie")!;
   assert.equal(job.status, "queued");
   assert.ok(!/Hana/.test(job.prompt), "no names go to the image model");
+  assert.match(job.prompt, /^old west WANTED poster/, "the style subject comes first, before the shared cartoon words");
   assert.ok(job.refKey && (await getMediaStore().get(job.refKey)), "the raw photo waits for the job");
   assert.ok(!JSON.stringify(publicView(room)).includes(job.refKey!), "raw photo keys are never in a view");
   assert.equal(publicView(room).selfies.length, 0, "nothing on the wall until the picture exists");

@@ -47,7 +47,7 @@ export const localImageModel: ImageModel = {
     const common = { prompt: r.prompt.slice(0, 1500), negative_prompt: r.negative ?? "", width: w, height: h };
     if (r.refs.length) {
       // Photo in, character art out: the diffusion model repaints the first reference photo to match the prompt.
-      return bytes(await callTool<B64>("stylize_photo", { ...common, image_b64: r.refs[0].toString("base64"), strength: r.strength ?? 0.6 }, 600_000));
+      return bytes(await callTool<B64>("stylize_photo", { ...common, image_b64: r.refs[0].toString("base64"), strength: r.strength ?? 0.8 }, 600_000));
     }
     return bytes(await callTool<B64>("generate_image", common, 600_000));
   },

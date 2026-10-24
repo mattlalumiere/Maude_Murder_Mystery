@@ -5,7 +5,7 @@ import { imageCost, SCENE_PHASES, VIDEO_PHASES, videoCost } from "./budget";
 import type { MediaItem, Phase, Player, Room } from "./types";
 import { PHASE_INFO } from "./types";
 
-const STYLE = "Colorful storybook cartoon illustration for a family-friendly murder mystery comedy, warm lighting, expressive faces, no gore, no text or letters.";
+const STYLE = "2D cartoon caricature illustration, flat colors, bold black outlines, cel shaded, exaggerated features, big expressive eyes, not a photo. Family-friendly murder mystery comedy, warm lighting, no gore, no text or letters.";
 
 function push(room: Room, m: Omit<MediaItem, "id" | "status" | "createdAt">) {
   room.media.push({ ...m, id: randomBytes(8).toString("base64url"), status: "queued", createdAt: Date.now() });

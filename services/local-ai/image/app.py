@@ -9,13 +9,16 @@ import base64, hashlib, io, os, textwrap
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
-from PIL import Image, ImageDraw, ImageFilter, ImageOps
+from PIL import Image, ImageDraw, ImageEnhance, ImageFilter, ImageOps
 from PIL.PngImagePlugin import PngInfo
 from pydantic import BaseModel, Field
 
 MODE = os.getenv("AI_MODE", "mock")
 MODEL_ID = os.getenv("IMAGE_MODEL", "stabilityai/sd-turbo")
 MAX_SIDE = int(os.getenv("IMAGE_MAX_SIDE", "768"))
+# Turbo models run without guidance, so a low strength just filters the photo. Redraw it instead.
+MIN_STRENGTH = float(os.getenv("IMAGE_MIN_STRENGTH", "0.78"))
+TOON_DEFAULT = os.getenv("IMAGE_TOON", "1") != "0"
 app = FastAPI(title="maude-local-image")
 
 
@@ -28,6 +31,19 @@ class Req(BaseModel):
     width: int = Field(default=512, ge=128, le=MAX_SIDE)
     height: int = Field(default=512, ge=128, le=MAX_SIDE)
     seed: Optional[int] = None
+    toon: Optional[bool] = None  # flat colors and ink outlines on top of the model output (default on in models mode)
+
+
+def toonify(img: Image.Image) -> Image.Image:
+    """Cartoon finish that does not depend on the model: smooth flat colors, richer saturation, dark ink outlines."""
+    img = img.convert("RGB")
+    flat = img.filter(ImageFilter.MedianFilter(5)).filter(ImageFilter.SMOOTH_MORE)
+    flat = ImageEnhance.Color(flat).enhance(1.4)
+    flat = ImageEnhance.Contrast(flat).enhance(1.12)
+    flat = flat.quantize(colors=24, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert("RGB")
+    gray = img.convert("L").filter(ImageFilter.GaussianBlur(1.4))
+    ink = gray.filter(ImageFilter.FIND_EDGES).point(lambda v: 255 if v > 18 else 0).filter(ImageFilter.MaxFilter(3))
+    return Image.composite(Image.new("RGB", img.size, (28, 22, 36)), flat, ink)
 
 
 def _decode(b64: str) -> Image.Image:
@@ -82,8 +98,9 @@ def _real(r: Req) -> Image.Image:
     kw = dict(prompt=r.prompt, guidance_scale=0.0, generator=gen)  # turbo models run without guidance
     if r.image_b64:
         init = ImageOps.fit(_decode(r.image_b64), (r.width, r.height))
-        steps = max(r.steps, int(1 / max(r.strength, 0.05)) + 1)  # img2img runs steps*strength denoising steps
-        return _pipes["i2i"](image=init, strength=r.strength, num_inference_steps=steps, **kw).images[0]
+        strength = max(r.strength, MIN_STRENGTH)
+        steps = max(r.steps, int(1 / max(strength, 0.05)) + 1)  # img2img runs steps*strength denoising steps
+        return _pipes["i2i"](image=init, strength=strength, num_inference_steps=steps, **kw).images[0]
     return _pipes["t2i"](width=r.width, height=r.height, num_inference_steps=r.steps, **kw).images[0]
 
 
@@ -95,6 +112,8 @@ def healthz():
 @app.post("/generate")
 def generate(r: Req):
     img = _mock(r) if MODE == "mock" else _real(r)
+    if MODE != "mock" and (TOON_DEFAULT if r.toon is None else r.toon):
+        img = toonify(img)
     meta = PngInfo()
     meta.add_text("prompt", r.prompt)
     meta.add_text("negative_prompt", r.negative_prompt)

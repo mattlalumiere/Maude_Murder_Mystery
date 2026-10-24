@@ -70,7 +70,7 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
       const directed = usesLocal(room) && job.kind !== "selfie" ? await directPrompt(room, job, textModelFor(room)) : null;
       const g = await imageModelFor(room).generate({
         prompt: directed?.prompt ?? job.prompt, caption: job.caption, refs, quality: room.budget.plan.quality,
-        shape: job.kind === "avatar" || job.kind === "selfie" ? "square" : "wide", negative: directed?.negative ?? (job.kind === "selfie" ? "gore, blood, nudity, scary, text, watermark" : undefined), strength: job.kind === "selfie" ? 0.6 : directed?.strength,
+        shape: job.kind === "avatar" || job.kind === "selfie" ? "square" : "wide", negative: directed?.negative ?? (job.kind === "selfie" ? "gore, blood, nudity, scary, text, watermark" : undefined), strength: job.kind === "selfie" ? 0.88 : directed?.strength,
       });
       out = { kind: "done", bytes: g.bytes, mime: g.mime, prompt: directed?.prompt };
     }

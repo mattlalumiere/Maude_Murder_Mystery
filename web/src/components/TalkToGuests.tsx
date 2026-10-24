@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Media";
 import { useBotVoice, VoiceToggle } from "@/components/BotVoice";
+import { micProblem } from "@/components/useCall";
 import { Button, Card, ErrorNote } from "@/components/kit";
 import { chatWithBot, credHeaders, friendlyError, type BotLineView, type BotView, type Creds } from "@/lib/client";
 
@@ -78,7 +79,7 @@ export function TalkToGuests({ code, creds, bots, log, adult, voiceReplies, stt 
       };
       rec.current = mr; setListening(true); mr.start();
       setTimeout(() => { if (mr.state === "recording") mr.stop(); }, 8000);
-    } catch { setErr("Microphone access was blocked. Allow it in your browser settings, or type instead."); }
+    } catch (e) { setErr(micProblem(e)); }
   }
 
   if (!bots.length) return null;

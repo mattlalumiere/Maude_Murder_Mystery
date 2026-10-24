@@ -3,18 +3,19 @@
 import { randomBytes } from "node:crypto";
 import { pricesForRoom } from "./ai/route";
 import { imageCost } from "./budget";
+import { CARTOON_SHORT } from "./prompt-director";
 import { HttpError } from "./store";
 import type { Player, Room } from "./types";
 
 export interface SelfieStyle { id: string; label: string; caption: string; prompt: string }
 
 export const SELFIE_STYLES: SelfieStyle[] = [
-  { id: "wanted", label: "Wanted poster", caption: "wanted for questioning", prompt: "A vintage wild-west wanted poster of the person in the reference photo, comically exaggerated outlaw, sepia paper, rope border, no text or letters." },
-  { id: "mugshot", label: "Silly mugshot", caption: "caught red-handed", prompt: "A comic police lineup photo of the person in the reference photo holding a rubber chicken, height chart behind them, goofy guilty grin, no text or letters." },
-  { id: "noir", label: "Film noir", caption: "the detective who knew too much", prompt: "A black-and-white film noir detective portrait of the person in the reference photo, trench coat, dramatic window-blind shadows, a magnifying glass, no text or letters." },
-  { id: "royal", label: "Royal portrait", caption: "of questionable nobility", prompt: "A grand oil-painting royal portrait of the person in the reference photo, powdered wig, ridiculous ruffled collar, a tiny pet frog on a cushion, no text or letters." },
-  { id: "villain", label: "Cartoon villain", caption: "plotting something", prompt: "A cartoon supervillain version of the person in the reference photo, twirly moustache or dramatic cape, evil-but-adorable laugh, bright colors, no text or letters." },
-  { id: "sidekick", label: "Superhero sidekick", caption: "ready for action", prompt: "A comic-book superhero sidekick version of the person in the reference photo, oversized cape, glitter mask, dramatic pose, bright colors, no text or letters." },
+  { id: "wanted", label: "Wanted poster", caption: "wanted for questioning", prompt: "old west WANTED poster outlaw, cowboy hat, bandana, sepia parchment, rope border" },
+  { id: "mugshot", label: "Silly mugshot", caption: "caught red-handed", prompt: "prisoner in black and white striped jumpsuit, jail cell bars, holding a number board, orange background, goofy grin" },
+  { id: "noir", label: "Film noir", caption: "the detective who knew too much", prompt: "film noir detective, trench coat, fedora hat, magnifying glass, black and white, window blind shadows" },
+  { id: "royal", label: "Royal portrait", caption: "of questionable nobility", prompt: "royal oil portrait, powdered white wig, giant ruffled collar, golden crown, velvet curtain, pet frog" },
+  { id: "villain", label: "Cartoon villain", caption: "plotting something", prompt: "evil supervillain, dramatic black cape, twirly moustache, villain lair, glowing green lights, evil grin" },
+  { id: "sidekick", label: "Superhero sidekick", caption: "ready for action", prompt: "superhero sidekick, glitter mask, red cape, spandex costume, city skyline, heroic pose" },
 ];
 
 export const MAX_SELFIES_PER_PLAYER = 3;
@@ -35,6 +36,6 @@ export function queueSelfie(room: Room, p: Player, styleId: unknown, refKey: str
   if (b.spentUsd + b.reservedUsd + est > b.capUsd + 1e-9) throw new HttpError(409, "The picture budget is used up");
   room.media.push({
     id: randomBytes(8).toString("base64url"), kind: "selfie", phase: room.phase, playerIds: [p.id], refKey,
-    caption: `${p.name}, ${style.caption}`, prompt: style.prompt, status: "queued", estCostUsd: est, createdAt: Date.now(),
+    caption: `${p.name}, ${style.caption}`, prompt: `${style.prompt}, ${CARTOON_SHORT}`, status: "queued", estCostUsd: est, createdAt: Date.now(),
   });
 }
