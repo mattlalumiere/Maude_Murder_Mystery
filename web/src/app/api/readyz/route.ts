@@ -4,7 +4,8 @@ import { getStore } from "@/lib/store";
 // Readiness: 200 only when the state store and the blob store answer. Never reports secrets.
 export const dynamic = "force-dynamic";
 
-const PROBE_KEY = "__readyz__";
+// Must satisfy the strict join-code and blob-key formats, or every adapter rejects the probe and readiness never turns green.
+const PROBE_CODE = "ZZZZ";
 const TIMEOUT_MS = 2000;
 
 function withTimeout<T>(p: Promise<T>, label: string): Promise<T> {
@@ -27,8 +28,8 @@ async function check(label: string, fn: () => Promise<unknown>): Promise<"ok" | 
 export async function GET() {
   const env = process.env;
   const [store, media] = await Promise.all([
-    check("store", async () => getStore().get(PROBE_KEY)),
-    check("media", async () => getMediaStore().get(`${PROBE_KEY}/probe`)),
+    check("store", async () => getStore().get(PROBE_CODE)),
+    check("media", async () => getMediaStore().get(`${PROBE_CODE}/gen/readyz-probe`)),
   ]);
   const ready = store === "ok" && media === "ok";
   const storeAdapter = env.STORE_ADAPTER || (env.ROOMS_TABLE ? "dynamo" : "memory");
