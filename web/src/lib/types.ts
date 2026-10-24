@@ -112,6 +112,9 @@ export interface GameConfig {
   drinking: "adults" | "heavy" | "none";
   /** Heavy mode only: the host confirms every drinker is of legal drinking age and chose to take part. */
   drinkingAttested?: boolean;
+  /** Adults-only unfiltered mode: no one under 18, darker taboo comedy. Needs the host's confirmation. */
+  adultsOnly?: boolean;
+  adultsAttested?: boolean;
   themePrompt: string;
   settingPrompt: string;
   tonePrompt: string;

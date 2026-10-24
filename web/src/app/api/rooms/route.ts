@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       const meta = await getStoryMeta(String(body.storyId));
       if (!meta) throw new HttpError(404, "That saved story was not found");
       if (meta.ownerKey !== ownerKeyOf(hostId) && (await engagementOf(meta.id)).reports >= STORY_LIMITS.reportHideThreshold) throw new HttpError(404, "That saved story was not found");
+      if (meta.adultsOnly && !(body.config?.adultsOnly === true && body.config?.adultsAttested === true)) throw new HttpError(400, "That story is adults only. Turn on adults-only mode (and confirm everyone is 18 or older) to play it.");
       story = { id: meta.id, mode: meta.kind === "cast" && body.storyMode === "choose" ? "choose" : "random" };
     }
     const room = await createRoom(hostId, body.overrideCode ?? "", body.config, body.capUsd, body.plan, { story });

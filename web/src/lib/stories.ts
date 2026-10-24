@@ -22,6 +22,8 @@ export interface StoryMeta {
   id: string; ownerKey: string; title: string; blurb: string; kind: StoryKind; visibility: Visibility; savedAt: number;
   setting: string; castCount: number; houses: string[]; characters?: CastPreview[];
   hasRecap: boolean; recapNames: boolean; recapPictures: boolean;
+  /** Saved from an adults-only game: link-only, never in the public gallery, and only replayable in an adults-only room. */
+  adultsOnly?: boolean;
 }
 export interface RecapImage { id: string; kind: string; caption: string; mime: string }
 export interface Recap {
@@ -128,7 +130,8 @@ export async function saveStory(room: Room, hostId: string, o: SaveOptions): Pro
   if (lib.length >= STORY_LIMITS.maxLibrary) throw new HttpError(409, `Your library is full (${STORY_LIMITS.maxLibrary}). Delete one first.`);
   const title = safeText(o.title, STORY_LIMITS.maxTitle, "title") || k.title.slice(0, STORY_LIMITS.maxTitle);
   const blurb = safeText(o.blurb, STORY_LIMITS.maxBlurb, "description");
-  const pub = o.visibility === "public";
+  const adultsOnly = room.config.adultsOnly === true;
+  const pub = o.visibility === "public" && !adultsOnly;
   const includeRecap = o.includeRecap && room.phase === "reveal" && !!room.result;
   // Public stories never carry real names or pictures of players (children may be in them).
   const recapNames = includeRecap && o.recapNames && !pub;
@@ -144,7 +147,7 @@ export async function saveStory(room: Room, hostId: string, o: SaveOptions): Pro
     id, ownerKey, title, blurb, kind: o.kind === "cast" ? "cast" : "story", visibility: pub ? "public" : "link", savedAt: Date.now(),
     setting: k.setting.slice(0, 600), castCount: pack.characters.length, houses: [...new Set(pack.characters.map((c) => c.house))].slice(0, 12),
     characters: o.kind === "cast" ? castPreview(pack) : undefined,
-    hasRecap: includeRecap, recapNames, recapPictures,
+    hasRecap: includeRecap, recapNames, recapPictures, ...(adultsOnly ? { adultsOnly: true } : {}),
   };
 
   const store = getStoryStore();

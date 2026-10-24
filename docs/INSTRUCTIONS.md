@@ -59,6 +59,15 @@ Running late? Trim a dare. Never trim the reveal. Or use the override (below).
 - In Act IV, submit a secret accusation on your phone: who did it, how, and why.
 - Scoring: killer 3, method 1, motive 1. The killer scores 5 for escaping if fewer than half the votes are right.
 
+## Adults-only mode (web app)
+
+In the setup wizard, **Who is playing?** has an **Adults only (unfiltered)** switch. It needs your confirmation that everyone is 18 or older. Then:
+
+- Kids, teens and little ones cannot join, and the kid counters disappear.
+- The AI writes dark, taboo, Cards Against Humanity style comedy: scandalous traits (Escort, Swinger, Cult leader, Hitman, Drug dealer and more), crude life stories, profanity in the chat and from AI guests, and extra filthy drink prompts if you chose the heavy night.
+- It never includes sexual abuse or violence (so there is no molester or molested role), anything about minors, slurs, or real people. Pictures and the TV stay tame, and "Pass" always works.
+- Stories saved from an adults-only game are link-only (never in the public gallery) and can only be replayed in an adults-only game.
+
 ## Your character, notebook, chat and selfies (web app)
 
 - **You stay you.** Your name, pronouns and age group never change. The story gives you an invented public job (like "Opera fan") and a private trait (like Gambler, Engineer, Retired spy or Whistleblower). One player is secretly the **Murderer** and one is the **Murdered**. Pick "She / He / They" when you join and the story will use it. Traits never involve anything unsuitable for children, so there is no trait about sexual abuse or sex work.

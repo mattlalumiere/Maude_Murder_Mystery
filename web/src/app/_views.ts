@@ -8,7 +8,7 @@ export type DrinkPublic = { paused: boolean; stopped: boolean; round: DrinkRound
 export type DrinkMe = { mode: "in" | "out"; limit: number; units: number; water: number; atLimit: boolean; paceHold: boolean; pending: DrinkRoundView | null };
 export type DrinkHost = { paused: boolean; stopped: boolean; players: { id: string; name: string; mode: "in" | "out"; limit: number; units: number; water: number; done: boolean }[] };
 
-export type BotCommon = { selfies?: { id: string; caption: string }[]; launch?: LaunchView | null; drink?: DrinkPublic; storyId?: string | null; stt?: "server" | "browser"; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
+export type BotCommon = { adultsOnly?: boolean; selfies?: { id: string; caption: string }[]; launch?: LaunchView | null; drink?: DrinkPublic; storyId?: string | null; stt?: "server" | "browser"; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
 
 export type MediaItemView = { id: string; kind: string; phase: string; caption: string; mime?: string };
 

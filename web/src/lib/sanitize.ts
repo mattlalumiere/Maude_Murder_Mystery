@@ -12,17 +12,20 @@ export function sanitizeConfig(i: Partial<GameConfig> | undefined): GameConfig {
   const x = i ?? {};
   const spice: Spice = (["mild", "medium", "spicy"] as const).includes(x.spice as Spice) ? (x.spice as Spice) : "medium";
   const len = [90, 120, 150].includes(Number(x.lengthMin)) ? (Number(x.lengthMin) as GameConfig["lengthMin"]) : 120;
+  const adultsOnly = x.adultsOnly === true;
   return {
     name: clean(x.name, LIMITS.configName),
     expected: {
       adults: int(x.expected?.adults, 2, LIMITS.expectedAdultsMax, 12),
-      kids: int(x.expected?.kids, 0, LIMITS.expectedKidsMax, 6),
-      toddlers: int(x.expected?.toddlers, 0, LIMITS.expectedToddlersMax, 1),
+      kids: adultsOnly ? 0 : int(x.expected?.kids, 0, LIMITS.expectedKidsMax, 6),
+      toddlers: adultsOnly ? 0 : int(x.expected?.toddlers, 0, LIMITS.expectedToddlersMax, 1),
     },
     lengthMin: len,
-    spice,
+    spice: adultsOnly ? "spicy" : spice,
     drinking: x.drinking === "none" ? "none" : x.drinking === "heavy" ? "heavy" : "adults",
     drinkingAttested: x.drinkingAttested === true,
+    adultsOnly: x.adultsOnly === true,
+    adultsAttested: x.adultsAttested === true,
     themePrompt: clean(x.themePrompt, LIMITS.configPrompt),
     settingPrompt: clean(x.settingPrompt, LIMITS.configPrompt),
     tonePrompt: clean(x.tonePrompt, LIMITS.configTone),

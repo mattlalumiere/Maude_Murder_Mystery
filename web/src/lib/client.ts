@@ -122,7 +122,7 @@ export function friendlyError(msg: string): string {
   return m;
 }
 
-export type WizardInput = { expected: { adults: number; kids: number; toddlers: number }; bots?: number; drinking?: string; attested?: boolean; overrideCode: string; budget: number };
+export type WizardInput = { expected: { adults: number; kids: number; toddlers: number }; bots?: number; drinking?: string; attested?: boolean; adultsOnly?: boolean; adultsAttested?: boolean; overrideCode: string; budget: number };
 export const WIZARD_STEPS = ["Guests", "Story", "Pictures", "Secret code"] as const;
 
 export function wizardProgress(step: number, total: number) {
@@ -137,6 +137,7 @@ export function validateWizardStep(step: number, v: WizardInput): string {
     const n = v.expected.adults + v.expected.kids + v.expected.toddlers + bots;
     if (!Number.isFinite(n) || n < 4) return "Plan for at least 4 guests so everyone gets a part. AI guests count too.";
     if (v.expected.adults + bots < 2) return "At least 2 grown-ups are needed (AI guests count as grown-ups).";
+    if (v.adultsOnly && !v.adultsAttested) return "Confirm that everyone playing is 18 or older to use adults-only mode.";
     if (v.drinking === "heavy" && !v.attested) return "Confirm the drinking-age statement to use the heavy drinking night.";
   }
   if (step === 3 && (!Number.isFinite(v.budget) || v.budget < 0)) return "Enter a budget of 0 or more.";

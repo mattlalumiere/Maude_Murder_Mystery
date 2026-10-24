@@ -40,7 +40,8 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
   const [heavy, setHeavy] = useState(false);
   const [drinkMode, setDrinkMode] = useState<"" | "in" | "out">("");
   const [drinkLimit, setDrinkLimit] = useState(4);
-  useEffect(() => { api<{ drinking?: string }>(`/api/rooms/${code}/state?role=screen`).then((s) => setHeavy(s.drinking === "heavy")).catch(() => setHeavy(false)); }, [code]);
+  const [adultsOnly, setAdultsOnly] = useState(false);
+  useEffect(() => { api<{ drinking?: string; adultsOnly?: boolean }>(`/api/rooms/${code}/state?role=screen`).then((s) => { setHeavy(s.drinking === "heavy"); setAdultsOnly(s.adultsOnly === true); }).catch(() => setHeavy(false)); }, [code]);
   const needsDrink = heavy && age === "adult";
   const ok = canJoin({ name, age, mode, text, photoBlob: !!photo.blob, photoConsent: !!photo.consent }) && (!needsDrink || drinkMode !== "");
 
@@ -71,11 +72,15 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
           <Field label="Your name" required>
             <input value={name} maxLength={24} autoComplete="given-name" data-testid="join-name" onChange={(e) => setName(e.target.value)} />
           </Field>
-          <Field label="Your age group">
-            <select value={age} data-testid="join-age" onChange={(e) => setAge(e.target.value as AgeGroup)}>
-              <option value="adult">Grown-up</option><option value="teen">Teen (13 to 15)</option><option value="kid">Kid (6 to 12)</option><option value="little">Little one (1 to 5), a grown-up helps</option>
-            </select>
-          </Field>
+          {adultsOnly ? (
+            <Notice data-testid="join-adults-only">This is an adults-only game. By joining you confirm you are 18 or older and ready for crude, taboo humor.</Notice>
+          ) : (
+            <Field label="Your age group">
+              <select value={age} data-testid="join-age" onChange={(e) => setAge(e.target.value as AgeGroup)}>
+                <option value="adult">Grown-up</option><option value="teen">Teen (13 to 15)</option><option value="kid">Kid (6 to 12)</option><option value="little">Little one (1 to 5), a grown-up helps</option>
+              </select>
+            </Field>
+          )}
           <Field label="How should the story refer to you?" hint="Your name and this choice are never changed. The story gives you a job and a secret, not a new identity.">
             <select value={pronouns} data-testid="join-pronouns" onChange={(e) => setPronouns(e.target.value as "he" | "she" | "they")}>
               <option value="they">They / them</option><option value="she">She / her</option><option value="he">He / him</option>

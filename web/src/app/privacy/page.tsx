@@ -21,6 +21,9 @@ export default function Privacy() {
         <li>Photos are meant to be deleted within 24 hours (the host&apos;s setup should enforce this), or sooner when the host or you delete them. The cartoon pictures expire with the game.</li>
       </ul>
 
+      <h2>Adults-only games</h2>
+      <p>A host can run an adults-only game with crude, dark humor. The host confirms that everyone playing is 18 or older, and no one under 18 can join that game. It is still fiction: there is no sexual abuse or violence, nothing involving minors, and no real people.</p>
+
       <h2>Selfie booth</h2>
       <ul>
         <li>A selfie is only used once, as a reference to make a funny AI picture (a wanted poster, a film noir detective, and so on). It is stripped of hidden details, safety-checked, and <b>deleted as soon as the picture is made</b>.</li>

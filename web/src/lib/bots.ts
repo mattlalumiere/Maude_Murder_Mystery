@@ -6,7 +6,8 @@ import { pricesForRoom, speechFor, textModelFor } from "./ai/route";
 import type { TextModel } from "./ai/ports";
 import type { SpeechModel } from "./ai/speech-port";
 import { getMediaStore } from "./media-store";
-import { mutate } from "./store";
+import { ADULT_HARD_LIMITS } from "./adults";
+import { getStore, mutate } from "./store";
 import { HttpError } from "./storage";
 import type { BotLine, Character, Phase, Player, Room } from "./types";
 
@@ -24,16 +25,18 @@ export const BOT_PERSONAS: { name: string; style: string }[] = [
 ];
 
 const BLOCK = /\b(fuck\w*|shit\w*|bitch\w*|cunt|nigg\w*|fag\w*|rape\w*|porn\w*|sex\w*|nude|naked|cocaine|heroin)\b/i;
+// Adults-only rooms allow profanity and raunch, but never slurs, sexual violence, or anything about minors.
+const BLOCK_ADULTS = /\b(nigg\w*|fag\w*|tranny|retard\w*|rape\w*|rapist\w*|molest\w*|pedo\w*|paedo\w*|incest\w*|child\s*porn\w*|cp)\b/i;
 const nowMs = () => Date.now();
 const rid = () => randomBytes(8).toString("base64url");
 
 export const botCharacter = (room: Room, bot: Player): Character | undefined => room.case?.characters.find((c) => c.id === bot.characterId);
 
 /** Cleans model or player text: no control characters, markdown, or run-on length. Returns null if unusable or unsafe. */
-export function cleanLine(text: string, max = BOT_LIMITS.maxLineChars): string | null {
+export function cleanLine(text: string, max = BOT_LIMITS.maxLineChars, adults = false): string | null {
   let t = String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\p{Extended_Pictographic}|\uFE0F|\u200D/gu, "").replace(/[*_`#>]+/g, "").replace(/\s+/g, " ").trim();
   t = t.replace(/^["'“]+|["'”]+$/g, "").trim();
-  if (!t || BLOCK.test(t)) return null;
+  if (!t || (adults ? BLOCK_ADULTS : BLOCK).test(t)) return null;
   if (t.length > max) {
     const cut = t.slice(0, max);
     const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
@@ -54,8 +57,10 @@ export function buildBotPrompt(room: Room, bot: Player, mode: { kind: "reply"; a
   const clues = publicClues(room);
   const recent = (room.botLog ?? []).slice(-6).map((l) => `${l.speaker}${l.to ? ` (to ${l.to})` : ""}: ${l.text}`);
   const system = [
-    `You are ${c.name}, ${c.tease} You are an AI guest at a family murder-mystery party, played in the style of ${bot.bot?.style ?? "a friendly party guest"}.`,
-    `Everyone in the room can hear you, including young children. Keep it family friendly: PG, no innuendo, no gore, no pressing anyone to drink.`,
+    `You are ${c.name}, ${c.tease} You are an AI guest at a ${room.config.adultsOnly ? "adults-only" : "family"} murder-mystery party, played in the style of ${bot.bot?.style ?? "a friendly party guest"}.`,
+    room.config.adultsOnly
+      ? `Everyone in this room is an adult who chose an unfiltered game. Be crude, wicked and shameless in the style of Cards Against Humanity, with raunchy innuendo and profanity played for laughs. ${ADULT_HARD_LIMITS}`
+      : `Everyone in the room can hear you, including young children. Keep it family friendly: PG, no innuendo, no gore, no pressing anyone to drink.`,
     `Reply in character in ONE to THREE short sentences, under ${BOT_LIMITS.maxLineChars} characters. Plain speech only: no stage directions, no emojis, no lists.`,
     `Your story: ${c.card.story}`,
     `Your alibi (what you tell people): ${publicAlibi(c.card)}`,
@@ -191,11 +196,11 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
   if (turn.useModel) {
     try {
       const r = await turn.text!.generate({ system: prompt.system, user: prompt.user, maxOutputTokens: 100, temperature: 0.9, timeoutMs: usesLocal(turn.room) ? 60_000 : 15_000, gameId: code });
-      text = cleanLine(r.text);
+      text = cleanLine(r.text, undefined, turn.room.config.adultsOnly === true);
       usedModel = !!text;
     } catch { /* falls back to the scripted line */ }
   }
-  text ??= cleanLine(fallback()) ?? "Quite a night, is it not?";
+  text ??= cleanLine(fallback(), undefined, turn.room.config.adultsOnly === true) ?? "Quite a night, is it not?";
 
   const id = rid();
   let audio: { key: string; mime: string } | null = null;
@@ -219,7 +224,7 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
 
 /** A player talks to a bot. `asker` must already be authenticated by the route. */
 export async function runBotChat(code: string, botId: string, asker: { id: string; name: string }, message: string): Promise<BotLine> {
-  const msg = cleanLine(message, BOT_LIMITS.maxMessageChars);
+  const msg = cleanLine(message, BOT_LIMITS.maxMessageChars, (await getStore().get(code))?.config.adultsOnly === true);
   if (!msg) throw new HttpError(400, "Say something friendly and short");
   const { result: turn } = await mutate(code, (room) => claimTurn(room, botId, "reply", asker));
   const prompt = buildBotPrompt(turn.room, turn.bot, { kind: "reply", asker: asker.name, message: msg });

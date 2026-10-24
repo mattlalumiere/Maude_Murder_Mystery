@@ -1,6 +1,7 @@
 // Story traits: a private flavour each player is cast with. Players keep their own name, age and pronouns;
-// the story only adds a role and a trait. The bank is deliberately free of sexual-abuse or sex-work roles:
-// this game is played with children in the room.
+// the story only adds a role and a trait. The family banks are free of sexual-abuse and sex-work roles because children play.
+// Adults-only rooms also draw from TRAITS_TABOO (see adults.ts), which still never includes sexual abuse or violence.
+import { TRAITS_TABOO } from "./adults";
 import { getRuntime } from "./ids";
 import type { Character } from "./types";
 
@@ -54,8 +55,8 @@ const rnd = (n: number) => getRuntime().random.int(n);
 const shuffle = <T,>(a: T[]) => { const r = [...a]; for (let i = r.length - 1; i > 0; i--) { const j = rnd(i + 1); [r[i], r[j]] = [r[j], r[i]]; } return r; };
 
 /** Gives every cast character a trait. The killer is the Murderer, the victim is Murdered, the rest are drawn without repeats. */
-export function assignTraits(characters: Character[], killerId: string, victimId: string): void {
-  const adults = shuffle(TRAITS_ADULT), kids = shuffle(TRAITS_KID);
+export function assignTraits(characters: Character[], killerId: string, victimId: string, adultsOnly = false): void {
+  const adults = adultsOnly ? [...shuffle(TRAITS_TABOO), ...shuffle(TRAITS_ADULT)] : shuffle(TRAITS_ADULT), kids = shuffle(TRAITS_KID);
   for (const c of characters) {
     if (c.id === killerId) c.trait = TRAIT_MURDERER.name;
     else if (c.id === victimId) c.trait = TRAIT_MURDERED.name;
@@ -70,5 +71,5 @@ export function assignTraits(characters: Character[], killerId: string, victimId
 
 export const traitAngle = (name: string | undefined): string => {
   if (!name) return "";
-  return [TRAIT_MURDERER, TRAIT_MURDERED, TRAIT_MASCOT, ...TRAITS_ADULT, ...TRAITS_KID].find((t) => t.name === name)?.angle ?? "";
+  return [TRAIT_MURDERER, TRAIT_MURDERED, TRAIT_MASCOT, ...TRAITS_ADULT, ...TRAITS_KID, ...TRAITS_TABOO].find((t) => t.name === name)?.angle ?? "";
 };

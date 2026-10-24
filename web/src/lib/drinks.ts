@@ -4,6 +4,7 @@
 //   - "tap out" at any time with no penalty, "done for the night" at any time,
 //   - a pace guard (no more than 2 drinks in 15 minutes), a forced water-and-food intermission, host pause and stop.
 // Children, teenagers, toddlers and AI guests are never part of any drink prompt.
+import { DRINK_TABOO } from "./adults";
 import { getRuntime } from "./ids";
 import type { DrinkPrompt, DrinkState, DrinkTally, Phase, Player, Room } from "./types";
 
@@ -52,10 +53,10 @@ type Slot = { title: string; text: string[]; units: number; scope: "all" | "targ
 /** Creative prompts per story beat. `{who}` is replaced on the screen by the chosen players. */
 export const DRINK_BANK: Partial<Record<Phase, Slot[]>> = {
   act1: [
-    { title: "The welcome toast", units: 1, scope: "all", text: ["Everyone raises a glass to the birthday man and drinks. Eyes up, glasses clinked.", "A toast to the host's questionable taste in guests. Everyone drinks."] },
+    { title: "The welcome toast", units: 1, scope: "all", text: ["Everyone raises a glass to the host and drinks. Eyes up, glasses clinked.", "A toast to the host's questionable taste in guests. Everyone drinks."] },
   ],
   death: [
-    { title: "The dead man's toast", units: 1, scope: "all", text: ["Gus is down! Everyone drinks to his memory, one dramatic gasp per sip.", "A moment of silence, then everyone drinks. He would have wanted it."] },
+    { title: "The dead man's toast", units: 1, scope: "all", text: ["{victim} is down! Everyone drinks to the memory, one dramatic gasp per sip.", "A moment of silence, then everyone drinks. {victim} would have wanted it."] },
   ],
   act2: [
     { title: "Alibi roulette", units: 1, scope: "targets", count: 2, text: ["{who}: drink, then say your alibi in one breath with a straight face.", "{who}: the spotlight finds you. Drink, then swear your alibi on a snack."] },
@@ -101,15 +102,17 @@ export function queueDrinkRound(room: Room, phase: Phase) {
   if (!everyone.length) return;
   const nameOf = (ids: string[]) => ids.map((id) => room.players.find((p) => p.id === id)?.name ?? "A guest").join(" and ");
 
-  for (const slot of DRINK_BANK[phase] ?? []) {
+  const victimName = room.case.characters.find((c) => c.id === room.case!.victimId)?.name ?? "Someone";
+  const slots = [...(DRINK_BANK[phase] ?? []), ...(room.config.adultsOnly && phase === "act2" ? DRINK_TABOO : [])];
+  for (const slot of slots) {
     if (slot.scope === "all") {
       // Drinkers with room left get the drink; everyone else (mocktail players, people at their limit) takes a water or a mocktail.
       const ids = slot.units === 0 ? everyone.map((p) => p.id) : everyone.filter((p) => p.profile.drink!.mode === "out" || !atLimit(p, st.tally[p.id])).map((p) => p.id);
-      if (ids.length) push(room, mk(room, phase, { title: slot.title, text: pickOne(slot.text), units: slot.units, scope: "all", targetIds: ids }));
+      if (ids.length) push(room, mk(room, phase, { title: slot.title, text: pickOne(slot.text).replace("{victim}", victimName), units: slot.units, scope: "all", targetIds: ids }));
     } else {
       const pool = shuffle(eligibleDrinkers(room, slot.units));
       const ids = pool.slice(0, Math.min(slot.count ?? 1, pool.length)).map((p) => p.id);
-      if (ids.length) push(room, mk(room, phase, { title: slot.title, text: pickOne(slot.text).replace("{who}", nameOf(ids)), units: slot.units, scope: "targets", targetIds: ids }));
+      if (ids.length) push(room, mk(room, phase, { title: slot.title, text: pickOne(slot.text).replace("{who}", nameOf(ids)).replace("{victim}", victimName), units: slot.units, scope: "targets", targetIds: ids }));
     }
   }
 

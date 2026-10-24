@@ -1,6 +1,7 @@
 // Self-cast: every player plays themselves. The story is written with name tokens like {{P3}}; when the cast is set
 // each token becomes that player's own name. Nobody's name, age or pronouns are changed by the story.
 import { getRuntime } from "./ids";
+import { TRAITS_TABOO } from "./adults";
 import { assignTraits, TRAIT_MASCOT, TRAIT_MURDERED, TRAIT_MURDERER, TRAITS_ADULT, TRAITS_KID } from "./traits";
 import type { CaseFile, Character, Player, Room } from "./types";
 
@@ -48,14 +49,14 @@ export function applySelfCast(room: Room) {
       c.trait = plan.traits[handle] ?? c.trait;
     }
   }
-  assignMissing(resolved.characters, resolved.killerId, resolved.victimId);
+  assignMissing(resolved.characters, resolved.killerId, resolved.victimId, room.config.adultsOnly === true);
   room.case = resolved;
 }
 
-function assignMissing(chars: Character[], killerId: string, victimId: string) {
+function assignMissing(chars: Character[], killerId: string, victimId: string, adultsOnly: boolean) {
   const missing = chars.filter((c) => !c.trait);
   if (!missing.length) return;
-  assignTraits(missing, killerId, victimId);
+  assignTraits(missing, killerId, victimId, adultsOnly);
 }
 
 // ---------- the plan handed to the AI before it writes ----------
@@ -81,7 +82,7 @@ export function planCast(room: Room, existing?: { killer: string; victim: string
     young.find(({ p }) => p.wantsVictim) ?? young.find(({ p }) => p.ageGroup === "kid") ?? young[0] ??
     hs.find(({ p }) => p.wantsVictim && p.ageGroup === "adult" && !p.isBot) ?? pick(hs.filter(({ p }) => p.ageGroup === "adult" && !p.isBot));
   const killer = pick(hs.filter(({ p, handle }) => p.ageGroup === "adult" && handle !== victim.handle));
-  const adultBank = [...TRAITS_ADULT], kidBank = [...TRAITS_KID];
+  const adultBank = room.config.adultsOnly ? [...TRAITS_TABOO, ...TRAITS_ADULT] : [...TRAITS_ADULT], kidBank = [...TRAITS_KID];
   const take = (bank: typeof adultBank) => (bank.length ? bank.splice(rnd(bank.length), 1)[0] : pick(TRAITS_ADULT));
   const traits: Record<string, string> = {};
   const entries: CastEntry[] = hs.map(({ p, handle }) => {

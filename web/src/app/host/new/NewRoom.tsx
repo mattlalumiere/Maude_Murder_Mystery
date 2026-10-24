@@ -57,7 +57,7 @@ export default function NewRoom() {
   const est = localAi ? { lines: [{ label: "Local services (no per-picture cost)", usd: 0 }], total: 0 } : estimate(activePlan, players);
   const over = est.total > budget;
   const set = <K extends keyof GameConfig>(k: K, v: GameConfig[K]) => setCfg((c) => ({ ...c, [k]: v }));
-  const input = { expected: cfg.expected, bots: botCount, drinking: cfg.drinking, attested: cfg.drinkingAttested === true, overrideCode: code, budget };
+  const input = { expected: cfg.expected, bots: botCount, drinking: cfg.drinking, attested: cfg.drinkingAttested === true, adultsOnly: cfg.adultsOnly === true, adultsAttested: cfg.adultsAttested === true, overrideCode: code, budget };
   const total = WIZARD_STEPS.length;
   const prog = wizardProgress(step, total);
 
@@ -116,12 +116,30 @@ export default function NewRoom() {
             </Field>
             <div className="sc-counts">
               <Counter id="adults" label="Grown-ups" hint="At least 2" value={cfg.expected.adults} min={0} max={40} onChange={(n) => set("expected", { ...cfg.expected, adults: n })} />
-              <Counter id="kids" label="Kids 6 to 15" hint="Welcome!" value={cfg.expected.kids} min={0} max={30} onChange={(n) => set("expected", { ...cfg.expected, kids: n })} />
-              <Counter id="toddlers" label="Little ones 1 to 5" hint="A grown-up helps" value={cfg.expected.toddlers} min={0} max={10} onChange={(n) => set("expected", { ...cfg.expected, toddlers: n })} />
+              {cfg.adultsOnly !== true && <Counter id="kids" label="Kids 6 to 15" hint="Welcome!" value={cfg.expected.kids} min={0} max={30} onChange={(n) => set("expected", { ...cfg.expected, kids: n })} />}
+              {cfg.adultsOnly !== true && <Counter id="toddlers" label="Little ones 1 to 5" hint="A grown-up helps" value={cfg.expected.toddlers} min={0} max={10} onChange={(n) => set("expected", { ...cfg.expected, toddlers: n })} />}
             </div>
             <div className="sc-counts" style={{ marginTop: "var(--space-3)" }} data-testid="wizard-bots">
               <Counter id="bots" label="AI guests" hint="Extra suspects that chat and speak. They count as grown-ups." value={botCount} min={0} max={8} onChange={setBotCount} />
             </div>
+          </Card>
+          <Card title="Who is playing?">
+            <label className="sc-check">
+              <input type="checkbox" checked={cfg.adultsOnly === true} data-testid="field-adults-only"
+                onChange={(e) => setCfg((c) => ({ ...c, adultsOnly: e.target.checked, adultsAttested: e.target.checked ? c.adultsAttested : false, expected: e.target.checked ? { ...c.expected, kids: 0, toddlers: 0 } : c.expected }))} />
+              <span><b>Adults only (unfiltered).</b> Dark, taboo, Cards Against Humanity style humor, with scandalous characters like escorts, swingers, dealers and cult leaders. No kids, teens or little ones can join.</span>
+            </label>
+            {cfg.adultsOnly === true && (
+              <div data-testid="adults-warning">
+                <Notice>
+                  Expect crude jokes, profanity and shameless secrets. It is still fiction and a mystery game: there is never sexual abuse or violence, nothing involving minors, no slurs, no real people, and anyone can say &quot;Pass&quot;. Pictures and the TV stay tame.
+                </Notice>
+                <label className="sc-check">
+                  <input type="checkbox" checked={cfg.adultsAttested === true} onChange={(e) => set("adultsAttested", e.target.checked)} data-testid="adults-attest" />
+                  <span>I confirm everyone playing is 18 or older, nobody under 18 is in the room, and everyone chose this kind of game.</span>
+                </label>
+              </div>
+            )}
           </Card>
           <Card>
             <Field label="Length">
@@ -254,7 +272,7 @@ export default function NewRoom() {
           </Card>
           <Card title="Summary" data-testid="summary">
             <ul className="clean">
-              <li>{cfg.name || "Party name: GM's pick"}, {cfg.lengthMin} min, {cfg.spice}, {cfg.drinking === "none" ? "alcohol-free" : cfg.drinking === "heavy" ? "heavy drinking night" : "optional sips"}</li>
+              <li>{cfg.name || "Party name: GM's pick"}, {cfg.lengthMin} min, {cfg.adultsOnly ? "adults only, unfiltered" : cfg.spice}, {cfg.drinking === "none" ? "alcohol-free" : cfg.drinking === "heavy" ? "heavy drinking night" : "optional sips"}</li>
               <li>About {players} players ({cfg.expected.adults} grown-ups, {cfg.expected.kids} kids, {cfg.expected.toddlers} little ones{botCount ? `, ${botCount} AI guest${botCount === 1 ? "" : "s"}` : ""})</li>
               <li>Budget {formatUsd(budget || 0)}, estimate {formatUsd(est.total)}</li>
             </ul>

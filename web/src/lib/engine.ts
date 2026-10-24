@@ -69,6 +69,9 @@ export async function createRoom(
   if (config.drinking === "heavy" && !config.drinkingAttested) {
     throw new HttpError(400, "Heavy drinking mode needs you to confirm that everyone who drinks is of legal drinking age and chose to take part.");
   }
+  if (config.adultsOnly && !config.adultsAttested) {
+    throw new HttpError(400, "Adults-only mode needs you to confirm that everyone playing is 18 or older and chose this kind of game.");
+  }
   const cap = money(capIn);
   const expected = config.expected.adults + config.expected.kids + config.expected.toddlers;
   // Local services have no per-picture price, so the budget does not trim their plan.
@@ -105,6 +108,7 @@ export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVic
   const clean = String(name ?? "").replace(/[{}]/g, "").trim().slice(0, LIMITS.playerName);
   if (!clean) throw new HttpError(400, "Name required");
   if (!["little", "kid", "teen", "adult"].includes(ageGroup)) throw new HttpError(400, "Bad age group");
+  if (room.config.adultsOnly && ageGroup !== "adult") throw new HttpError(403, "This is an adults-only game. Everyone must be 18 or older.");
   if (room.players.length >= LIMITS.maxPlayers) throw new HttpError(409, "Room is full");
   if (room.players.some((p) => p.name.toLowerCase() === clean.toLowerCase())) throw new HttpError(409, "That name is taken");
   const p: Player = {
@@ -434,6 +438,7 @@ export function publicView(room: Room) {
     narration: k?.narration[room.phase],
     lobbyNames: room.players.map((p) => p.name),
     starting: !!room.generating,
+    adultsOnly: room.config.adultsOnly === true,
     drink: publicDrinkView(room),
     launch: launchView(room),
     storyId: room.storyId ?? null,

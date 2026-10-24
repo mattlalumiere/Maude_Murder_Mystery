@@ -18,7 +18,7 @@ function add(room: Room, m: Omit<ChatMsg, "id" | "ts">): ChatMsg {
 
 export function postChat(room: Room, p: Player, text: string): ChatMsg {
   if (room.paused) throw new HttpError(409, "The game is paused. Take a breath.");
-  const t = cleanLine(text, MAX_CHARS);
+  const t = cleanLine(text, MAX_CHARS, room.config.adultsOnly === true);
   if (!t) throw new HttpError(400, "Say something friendly and short");
   const last = [...(room.chat ?? [])].reverse().find((m) => m.from === p.id);
   if (last && Date.now() - last.ts < MIN_GAP_MS) throw new HttpError(429, "Easy there, one message at a time");

@@ -61,6 +61,15 @@ Assign one private trait per player; never repeat one in a group. Exactly one pl
 
 **Life story (grown-ups):** early life (a strange childhood), love life (comic, fictional rivals and mix-ups), hobbies, and an ambition, all in the campaign's theme and tone. Keep real people out of it.
 
+## Adults-Only Mode (unfiltered, only with the host's 18+ confirmation)
+
+Use only in a room with nobody under 18. The tone is dark, taboo and Cards Against Humanity crude: shameless, absurd, profane, played for laughs among adults who chose it. All of it is fiction and cartoonish.
+
+- **Taboo traits (adults only):** Escort, Dominatrix, Adult film star, Brothel madam, Gigolo, Cam model, Phone-sex operator, Swinger, Serial cheater, Professional mistress, Drug dealer, Cult leader, Arms dealer, Hitman, Embezzler, Sleazy landlord, Disgraced televangelist, Pyramid-scheme queen, Pill-popping surgeon, Hoarder of compromising photos, Trust-fund degenerate, Professional mourner. Mix them with the normal adult traits.
+- **Humor pattern:** pair a respectable setting with a terrible secret ("the church bake sale was a front"), escalate the bad decisions, and let a prim narrator describe filthy things politely. Secrets, alibis and love lives can be about affairs, kinks, vices, scams and disgusting habits.
+- **Extra drink prompts (opt-in, within each person's limit):** "Never have I ever (filthy edition)" and "Confessions" rounds. The heavy-night safeguards still apply.
+- **Never, even here:** sexual abuse or sexual violence (so no molester or molested traits, no rape jokes or plots), anything involving minors, slurs or hate toward real groups, real people, pressuring anyone to drink. Pictures and the TV stay tame.
+
 ## "Snack or Silly" (kids' parallel mechanic, and non-drinking adults)
 
 Whenever a drink trigger fires, kids and non-drinkers choose: a bite of snack, a sip of juice/soda, OR do a **mini-silly** (3-sec): flex like a superhero, do a robot noise, wave like royalty. No alcohol-adjacent props for kids (no toy wine glasses necessary; use juice goblets).
