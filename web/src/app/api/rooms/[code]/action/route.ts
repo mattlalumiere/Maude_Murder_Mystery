@@ -3,6 +3,7 @@ import { textModelFor } from "@/lib/ai/route";
 import { addBots, addPlayer, advance, authPlayer, beginGeneration, drinkAnswer, drinkControl, drinkDone, drinkLog, drinkWater, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, saveNotes, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
 import { dropAvatar, regenAvatar } from "@/lib/media-jobs";
+import { answerCall, endCall, startCall } from "@/lib/calls";
 import { hostNext, setReady, voteSkip } from "@/lib/rounds";
 import { deleteSelfie, regenSelfie } from "@/lib/selfie";
 import { getStore, HttpError, mutate } from "@/lib/store";
@@ -28,6 +29,9 @@ type Body =
   | { type: "skipIntermission"; skip?: boolean }
   | { type: "deleteSelfie" | "regenSelfie"; id: string; style?: string }
   | { type: "regenPortrait" | "deletePortrait" }
+  | { type: "startCall"; to: string; offer: string }
+  | { type: "answerCall"; id: string; answer: string }
+  | { type: "endCall"; id: string }
   | { type: "ballot"; ballot: Ballot };
 
 const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos", "addBots", "setBotConfig", "drinkControl"]);
@@ -81,6 +85,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
         case "regenSelfie": regenSelfie(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), String(body.id), body.style); break;
         case "regenPortrait": await regenAvatar(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
         case "deletePortrait": await dropAvatar(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "startCall": out = { callId: startCall(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), String(body.to), body.offer).id }; break;
+        case "answerCall": answerCall(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), String(body.id), body.answer); break;
+        case "endCall": endCall(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), String(body.id)); break;
         case "skipIntermission": voteSkip(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.skip !== false); break;
         case "ready": setReady(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ready !== false); break;
         case "ballot": submitBallot(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ballot); break;

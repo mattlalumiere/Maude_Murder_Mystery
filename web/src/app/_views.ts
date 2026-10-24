@@ -8,6 +8,7 @@ export type DrinkPublic = { paused: boolean; stopped: boolean; round: DrinkRound
 export type DrinkMe = { mode: "in" | "out"; limit: number; units: number; water: number; atLimit: boolean; paceHold: boolean; pending: DrinkRoundView | null };
 export type DrinkHost = { paused: boolean; stopped: boolean; players: { id: string; name: string; mode: "in" | "out"; limit: number; units: number; water: number; done: boolean }[] };
 
+export type CallView = { id: string; withId: string; withName: string; role: "caller" | "callee"; state: "ringing" | "active" | "ended"; offer?: string; answer?: string };
 export type RoundView = { canReady: boolean; ready: number; total: number; needed: number; countdownMs: number | null; intermission: { toTitle: string; stage: "gm" | "break"; gm: { title: string; text: string; clock: string } | null; remainingMs: number; skipVotes: number; skipNeeded: number; artLeft: number; artTotal: number } | null };
 export type RecapLine = { id: string; who: string; text: string; bot: boolean; botId: string; audio: boolean; ts: number };
 export type BotCommon = { round?: RoundView; recap?: RecapLine[]; adultsOnly?: boolean; selfies?: { id: string; caption: string }[]; launch?: LaunchView | null; drink?: DrinkPublic; storyId?: string | null; stt?: "server" | "browser"; bots: BotView[]; botLog: BotLineView[]; botConfig: { chatter: boolean; voice: boolean }; speech: "server" | "browser" };
@@ -32,7 +33,9 @@ export type HostState = BotCommon & {
 export type Opt = { id: string; text?: string; name?: string; house?: string };
 
 export type PlayerState = BotCommon & {
-  chat?: { id: string; from: string; name: string; text: string; bot: boolean; ts: number }[];
+  chat?: { id: string; from: string; name: string; text: string; bot: boolean; ts: number; private?: boolean; to?: string; toName?: string }[];
+  people?: { id: string; name: string; isBot: boolean; canCall: boolean }[];
+  calls?: CallView[];
   version: number; phase: string; phaseTitle: string; paused: boolean; narration?: string; setting?: string; title?: string;
   starting?: boolean; drinking?: "adults" | "heavy" | "none";
   lobbyNames: string[]; clues: { id: string; text: string }[]; ballotsOpen: boolean;

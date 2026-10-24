@@ -7,6 +7,8 @@ import { POST as chatPost } from "../src/app/api/rooms/[code]/chat/route";
 import { POST as selfiePost } from "../src/app/api/rooms/[code]/selfie/route";
 import { deleteSelfie, regenSelfie } from "../src/lib/selfie";
 import { dropAvatar, regenAvatar } from "../src/lib/media-jobs";
+import { postChat } from "../src/lib/chat";
+import { answerCall, endCall, startCall } from "../src/lib/calls";
 import { SELFIE_STYLES } from "../src/lib/selfie-styles";
 import { getStore, mutate } from "../src/lib/store";
 
@@ -14,6 +16,7 @@ const SMALL = Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIC
 // Pad with a comment segment (stripped by the server) so the upload clears the minimum size.
 const pad = Buffer.alloc(1500, 0x20);
 const FACE = Buffer.concat([SMALL.subarray(0, 2), Buffer.from([0xff, 0xfe, (pad.length + 2) >> 8, (pad.length + 2) & 0xff]), pad, SMALL.subarray(2)]);
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const load = async (code: string) => (await getStore().get(code))!;
 const hdr = (p: { id: string; token: string }, extra: Record<string, string> = {}) => ({ "x-player-id": p.id, "x-player-token": p.token, ...extra });
 const ctx = (code: string) => ({ params: Promise.resolve({ code }) });
@@ -59,6 +62,55 @@ async function main() {
   await new Promise((res) => setTimeout(res, 1600));
   assert.equal((await post(ben, "paused?")).status, 409, "no chat while paused");
   await mutate(code, (rm) => { rm.paused = false; });
+
+  // ---- private messages and voice calls between players (and with AI guests)
+  const cleo = room.players.find((p) => p.name === "Cleo")!;
+  await sleep(1600);
+  await mutate(code, (rm) => { postChat(rm, rm.players.find((p) => p.id === hana.id)!, "Psst Ben, I saw the butler", ben.id); });
+  room = await load(code);
+  const seen = (pid: string) => playerView(room, room.players.find((p) => p.id === pid)!).chat.map((m) => m.text);
+  assert.ok(seen(ben.id).includes("Psst Ben, I saw the butler") && seen(hana.id).includes("Psst Ben, I saw the butler"), "sender and recipient see it");
+  assert.ok(!seen(cleo.id).includes("Psst Ben, I saw the butler"), "nobody else sees a private message");
+  assert.ok(!JSON.stringify(publicView(room)).includes("saw the butler"), "never on the TV or in the recap");
+  await sleep(1600);
+  assert.throws(() => postChat(room, hana, "to myself", hana.id), /someone else/);
+  const dm = await chatPost(new Request("http://x", { method: "POST", headers: hdr(hana), body: JSON.stringify({ text: "Where were you really?", to: bot.id }) }), ctx(code));
+  assert.equal(dm.status, 200);
+  room = await load(code);
+  const botReply = room.chat!.find((m) => m.bot && m.to === hana.id);
+  assert.ok(botReply, "the AI guest answers a private message privately");
+  assert.ok(playerView(room, room.players.find((p) => p.id === cleo.id)!).chat.every((m) => m.id !== botReply!.id && !m.private), "others never see it");
+  assert.ok(room.botLog!.some((l) => l.toId === hana.id), "kept, but marked private");
+  const privateLine = room.botLog!.find((l) => l.toId === hana.id)!;
+  assert.ok(!publicView(room).botLog.some((l) => l.id === privateLine.id), "private AI replies are not on the TV ticker");
+  assert.ok(!publicView(room).recap.some((l) => l.id === privateLine.id));
+
+  const offer = JSON.stringify({ type: "offer", sdp: "v=0\r\no=- 1 2 IN IP4 127.0.0.1\r\ns=-\r\n" });
+  const answerSdp = JSON.stringify({ type: "answer", sdp: "v=0\r\no=- 3 4 IN IP4 127.0.0.1\r\ns=-\r\n" });
+  let callId = "";
+  await mutate(code, (rm) => { callId = startCall(rm, rm.players.find((p) => p.id === hana.id)!, ben.id, offer).id; });
+  room = await load(code);
+  const callOf = (pid: string) => playerView(room, room.players.find((p) => p.id === pid)!).calls;
+  assert.equal(callOf(ben.id)[0].offer, offer, "the callee gets the offer");
+  assert.equal(callOf(ben.id)[0].role, "callee");
+  assert.equal(callOf(hana.id)[0].offer, undefined, "the caller does not need it back");
+  assert.deepEqual(callOf(cleo.id), [], "no one else sees a call or its details");
+  assert.throws(() => startCall(room, room.players.find((p) => p.id === cleo.id)!, ben.id, offer), /already on a call/);
+  assert.throws(() => startCall(room, room.players.find((p) => p.id === cleo.id)!, zed.id, offer), /cannot take voice calls/);
+  assert.throws(() => startCall(room, zed, ben.id, offer), /grown-ups/, "children text but do not call");
+  assert.throws(() => startCall(room, cleo, bot.id, offer), /cannot take voice calls/, "AI guests are called with the bot voice chat, not here");
+  const dmitri = room.players.find((p) => p.name === "Dmitri")!;
+  assert.throws(() => startCall(room, cleo, dmitri.id, "junk"), /Bad call/);
+  assert.throws(() => answerCall(room, room.players.find((p) => p.id === cleo.id)!, callId, answerSdp), /not for you/);
+  await mutate(code, (rm) => { answerCall(rm, rm.players.find((p) => p.id === ben.id)!, callId, answerSdp); });
+  room = await load(code);
+  assert.equal(callOf(hana.id)[0].answer, answerSdp, "the caller gets the answer");
+  assert.equal(callOf(hana.id)[0].state, "active");
+  await mutate(code, (rm) => { endCall(rm, rm.players.find((p) => p.id === ben.id)!, callId); });
+  room = await load(code);
+  assert.equal(callOf(hana.id)[0].state, "ended");
+  await mutate(code, (rm) => { startCall(rm, rm.players.find((p) => p.id === cleo.id)!, hana.id, offer); }); // free again after the call ended
+  await mutate(code, (rm) => { rm.calls = []; });
 
   // ---- selfie booth
   const selfie = (p: typeof hana, extra: Record<string, string> = {}, bytes: Buffer = FACE) =>

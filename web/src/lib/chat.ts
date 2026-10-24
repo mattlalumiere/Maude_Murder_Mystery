@@ -16,17 +16,22 @@ function add(room: Room, m: Omit<ChatMsg, "id" | "ts">): ChatMsg {
   return msg;
 }
 
-export function postChat(room: Room, p: Player, text: string): ChatMsg {
+export function postChat(room: Room, p: Player, text: string, to?: string): ChatMsg {
   if (room.paused) throw new HttpError(409, "The game is paused. Take a breath.");
   const t = cleanLine(text, MAX_CHARS, room.config.adultsOnly === true);
   if (!t) throw new HttpError(400, "Say something friendly and short");
   const last = [...(room.chat ?? [])].reverse().find((m) => m.from === p.id);
   if (last && Date.now() - last.ts < MIN_GAP_MS) throw new HttpError(429, "Easy there, one message at a time");
+  if (to !== undefined && to !== "") {
+    const target = room.players.find((x) => x.id === to);
+    if (!target || target.id === p.id) throw new HttpError(400, "Pick someone else to message");
+    return add(room, { from: p.id, to: target.id, name: p.name, text: t });
+  }
   return add(room, { from: p.id, name: p.name, text: t });
 }
 
-export function postBotChat(room: Room, bot: Player, text: string): ChatMsg {
-  return add(room, { from: bot.id, name: bot.name, text, bot: true });
+export function postBotChat(room: Room, bot: Player, text: string, to?: string): ChatMsg {
+  return add(room, { from: bot.id, name: bot.name, text, bot: true, ...(to ? { to } : {}) });
 }
 
 /** The AI guest a message is aimed at: named first, or the character's first name. Null if nobody is addressed. */
@@ -41,4 +46,8 @@ export function addressedBot(room: Room, text: string): Player | null {
   return null;
 }
 
-export const chatView = (room: Room) => (room.chat ?? []).slice(-CHAT_VIEW_COUNT).map((m) => ({ id: m.id, from: m.from, name: m.name, text: m.text, bot: !!m.bot, ts: m.ts }));
+/** What one player may read: the table's messages plus private ones they sent or received. */
+export const chatView = (room: Room, viewerId: string) => (room.chat ?? [])
+  .filter((m) => !m.to || m.from === viewerId || m.to === viewerId)
+  .slice(-CHAT_VIEW_COUNT)
+  .map((m) => ({ id: m.id, from: m.from, name: m.name, text: m.text, bot: !!m.bot, ts: m.ts, private: !!m.to, to: m.to, toName: m.to ? room.players.find((x) => x.id === m.to)?.name : undefined }));

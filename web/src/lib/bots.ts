@@ -190,7 +190,7 @@ async function speakLine(sp: SpeechModel, code: string, id: string, text: string
   return { key, mime: out.mime };
 }
 
-async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prompt: { system: string; user: string }, fallback: () => string, meta: { to?: string; phase: Phase }): Promise<BotLine> {
+async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prompt: { system: string; user: string }, fallback: () => string, meta: { to?: string; toId?: string; phase: Phase }): Promise<BotLine> {
   let text: string | null = null;
   let usedModel = false;
   if (turn.useModel) {
@@ -211,7 +211,7 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
   const actual = (usedModel ? price.botChat : 0) + (audio ? speechCost(turn.speech, text.length) : 0);
   const c = botCharacter(turn.room, turn.bot);
   const line: BotLine = {
-    id, botId: turn.bot.id, speaker: c?.name ?? turn.bot.name, text, phase: meta.phase, kind, to: meta.to,
+    id, botId: turn.bot.id, speaker: c?.name ?? turn.bot.name, text, phase: meta.phase, kind, to: meta.to, ...(meta.toId ? { toId: meta.toId } : {}),
     audioKey: audio?.key, audioMime: audio?.mime, ts: nowMs(),
   };
   await mutate(code, (room) => {
@@ -223,12 +223,12 @@ async function produce(code: string, turn: Turn, kind: "reply" | "chatter", prom
 }
 
 /** A player talks to a bot. `asker` must already be authenticated by the route. */
-export async function runBotChat(code: string, botId: string, asker: { id: string; name: string }, message: string): Promise<BotLine> {
+export async function runBotChat(code: string, botId: string, asker: { id: string; name: string }, message: string, opts: { private?: boolean } = {}): Promise<BotLine> {
   const msg = cleanLine(message, BOT_LIMITS.maxMessageChars, (await getStore().get(code))?.config.adultsOnly === true);
   if (!msg) throw new HttpError(400, "Say something friendly and short");
   const { result: turn } = await mutate(code, (room) => claimTurn(room, botId, "reply", asker));
   const prompt = buildBotPrompt(turn.room, turn.bot, { kind: "reply", asker: asker.name, message: msg });
-  return produce(code, turn, "reply", prompt, () => scriptedReply(turn.room, turn.bot, msg), { to: asker.name, phase: turn.room.phase });
+  return produce(code, turn, "reply", prompt, () => scriptedReply(turn.room, turn.bot, msg), { to: asker.name, ...(opts.private ? { toId: asker.id } : {}), phase: turn.room.phase });
 }
 
 /** One tick of the chatter worker: speaks the next queued story-beat line, if any. */

@@ -74,6 +74,8 @@ Selfies use the same image provider and budget as portraits (each one is claimed
 
 Video clips are 12 seconds on AWS by default (Nova Reel multi-shot; set `VIDEO_SECONDS` to 6, 12, 18 and so on, and note that the budget estimate scales with it), and about 18 seconds on local services (`LOCAL_VIDEO_SECONDS`). The multi-shot request shape is from documentation and has not run against real AWS. Timing can be tuned with `READY_COUNTDOWN_MS` (default 2 minutes), `GM_MESSAGE_MS` (default 30 seconds) and `INTERMISSION_MS` (default 5 minutes).
 
+Player-to-player voice calls use WebRTC with Google's public STUN server by default; calls between phones on different networks may need a TURN relay on very strict networks, which this repo does not provide. Test one call across Wi-Fi and cellular before the party.
+
 ## 5. Party-day checklist
 
 - [ ] Deploy at least a day ahead; re-run `/api/healthz`.

@@ -6,9 +6,10 @@ import { Button, Card, ErrorNote } from "@/components/kit";
 import { friendlyError, postChatMessage, type BotView, type ChatLineView, type Creds } from "@/lib/client";
 
 /** Group chat for the table. Say an AI guest's name and they answer. Grown-ups can also start a hands-free voice call with a guest. */
-export function TableTalk({ code, creds, meId, chat, bots, adult, stt, voiceReplies }: {
-  code: string; creds: Creds; meId: string; chat: ChatLineView[]; bots: BotView[]; adult: boolean; stt: "server" | "browser"; voiceReplies: boolean;
+export function TableTalk({ code, creds, meId, chat, bots, people = [], adult, stt, voiceReplies }: {
+  code: string; creds: Creds; meId: string; chat: ChatLineView[]; bots: BotView[]; people?: { id: string; name: string; isBot: boolean }[]; adult: boolean; stt: "server" | "browser"; voiceReplies: boolean;
 }) {
+  const [to, setTo] = useState("");
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -26,7 +27,7 @@ export function TableTalk({ code, creds, meId, chat, bots, adult, stt, voiceRepl
     if (!m) return;
     setBusy(true); setErr("");
     try {
-      const r = await postChatMessage(code, m, creds);
+      const r = await postChatMessage(code, m, creds, spoken ? undefined : to || undefined);
       if (r.reply && (spoken || voiceReplies)) voice.speak(r.reply);
     } catch (e) { setErr(friendlyError((e as Error).message)); if (!spoken) setText(m); }
     setBusy(false);
@@ -48,11 +49,21 @@ export function TableTalk({ code, creds, meId, chat, bots, adult, stt, voiceRepl
     <Card title="Table talk" data-testid="table-talk" style={{ marginTop: "var(--space-3)" }}>
       <ul className="clean" aria-live="polite" data-testid="chat-thread" style={{ maxHeight: 220, overflowY: "auto", margin: "0 0 var(--space-3)" }}>
         {chat.length === 0 && <li className="muted">Nothing yet. {bots.length ? "Say a guest's name to get their attention." : "Say hello to the table."}</li>}
-        {chat.map((m) => <li key={m.id} data-testid="chat-line"><b>{m.from === meId ? "You" : m.name}{m.bot && !/\(AI\)\s*$/.test(m.name) ? " (AI)" : ""}:</b> {m.text}</li>)}
+        {chat.map((m) => (
+          <li key={m.id} data-testid="chat-line" data-private={m.private ? "true" : "false"} style={m.private ? { fontStyle: "italic" } : undefined}>
+            <b>{m.from === meId ? "You" : m.name}{m.bot && !/\(AI\)\s*$/.test(m.name) ? " (AI)" : ""}{m.private ? (m.from === meId ? ` (private to ${m.toName ?? "someone"})` : " (private to you)") : ""}:</b> {m.text}
+          </li>
+        ))}
         <li ref={end} aria-hidden />
       </ul>
       {err && <ErrorNote>{err}</ErrorNote>}
       <form onSubmit={(e) => { e.preventDefault(); const t = text; setText(""); void post(t); }} className="sc-actions">
+        {people.length > 0 && (
+          <select value={to} onChange={(e) => setTo(e.target.value)} aria-label="Send to" data-testid="chat-to" style={{ maxWidth: 160 }}>
+            <option value="">Everyone</option>
+            {people.map((x) => <option key={x.id} value={x.id}>{x.name}{x.isBot ? " (AI)" : ""} (private)</option>)}
+          </select>
+        )}
         <input value={text} maxLength={240} placeholder="Say something to the table..." aria-label="Message to the table" data-testid="chat-input" onChange={(e) => setText(e.target.value)} style={{ flex: 1, minWidth: 160 }} />
         <Button type="submit" disabled={busy || !text.trim()} data-testid="chat-send">Send</Button>
       </form>
@@ -90,7 +101,7 @@ export function TableTalk({ code, creds, meId, chat, bots, adult, stt, voiceRepl
         </div>
       )}
       <p className="muted" style={{ fontSize: "var(--text-xs)" }}>
-        Everyone at the table can read this chat. AI guests are characters, and keep it friendly.
+        Messages to Everyone are read by the whole table. A private message is seen only by you and the person you pick. AI guests are characters, and keep it friendly.
         {adult && bots.length > 0 && (stt === "browser" ? " Voice calls use your browser's speech service, which may send your voice to its maker." : " Voice calls send your voice only to the host's own computer.")}
       </p>
     </Card>

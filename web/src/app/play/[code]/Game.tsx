@@ -12,6 +12,7 @@ import { GmMessage, Intermission, ReadyBar } from "@/components/RoundBar";
 import { StoryVote } from "@/components/StoryVote";
 import { TalkToGuests } from "@/components/TalkToGuests";
 import { TableTalk } from "@/components/TableTalk";
+import { PeerCall } from "@/components/PeerCall";
 import { Notebook } from "@/components/Notebook";
 import { SelfieBooth } from "@/components/SelfieBooth";
 import { Badge, Candle, Card, ConnectionCandle, ErrorNote, Fog, PaperClue, Skeleton } from "@/components/kit";
@@ -87,13 +88,17 @@ export function Game({ code, creds }: { code: string; creds: Creds }) {
         <Notebook code={code} creds={creds} playerId={me.id} initial={me.notes ?? ""} headings={ch.card.opening?.notes ?? []} />
       )}
 
-      {!inLobby && !cardsPhase && (
-        <TableTalk code={code} creds={creds} meId={me.id} chat={state.chat ?? []} bots={state.bots} adult={me.ageGroup === "adult"} stt={state.stt ?? "browser"} voiceReplies={state.botConfig.voice} />
+      {!inLobby && (
+        <TableTalk code={code} creds={creds} meId={me.id} chat={state.chat ?? []} bots={state.bots} people={state.people} adult={me.ageGroup === "adult"} stt={state.stt ?? "browser"} voiceReplies={state.botConfig.voice} />
+      )}
+
+      {!inLobby && (
+        <PeerCall code={code} creds={creds} calls={state.calls ?? []} people={state.people ?? []} adult={me.ageGroup === "adult"} refresh={refresh} />
       )}
 
       {!inLobby && !cardsPhase && state.bots.length > 0 && (
         <details className="sc-panel" data-testid="private-ask" style={{ marginTop: "var(--space-3)" }}>
-          <summary>Ask a guest privately</summary>
+          <summary>Ask an AI guest privately (voice or text)</summary>
           <div className="sc-panel__body">
             <TalkToGuests code={code} creds={creds} bots={state.bots} log={state.botLog} adult={me.ageGroup === "adult"} voiceReplies={state.botConfig.voice} stt={state.stt} />
           </div>

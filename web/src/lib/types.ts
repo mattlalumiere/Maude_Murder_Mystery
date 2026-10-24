@@ -195,6 +195,8 @@ export interface BotLine {
   kind: "reply" | "chatter";
   /** Name of the player this reply answers. */
   to?: string;
+  /** Set when the reply is private: only this player's phone gets it, never the TV, recap or other players. */
+  toId?: string;
   audioKey?: string;
   audioMime?: string;
   ts: number;
@@ -220,9 +222,22 @@ export interface DrinkState { prompts: DrinkPrompt[]; tally: Record<string, Drin
 export interface ChatMsg {
   id: string;
   from: string;
+  /** Set for a private message: only the sender and this player see it. */
+  to?: string;
   name: string;
   text: string;
   bot?: boolean;
+  ts: number;
+}
+
+/** A voice call between two players, set up by passing WebRTC offers and answers through the server. */
+export interface Call {
+  id: string;
+  from: string;
+  to: string;
+  state: "ringing" | "active" | "ended";
+  offer: string;
+  answer?: string;
   ts: number;
 }
 
@@ -311,6 +326,8 @@ export interface Room {
   readyDeadline?: number;
   /** A short break between rounds while the next round's pictures render. */
   transition?: { to: Phase; startedAt: number; until: number; skip?: string[]; stage: "gm" | "break"; gmUntil: number };
+  /** Voice calls between players (kept briefly). */
+  calls?: Call[];
   /** The table talk: short messages between players and AI guests. */
   chat?: ChatMsg[];
   botQueue?: BotQueueItem[];

@@ -11,6 +11,7 @@ import { generateCase } from "./gm-ai";
 import { beginLives, fillMissingLives } from "./life";
 import { launchView } from "./launch";
 import { chatView } from "./chat";
+import { callsView } from "./calls";
 import { deleteAllSelfies } from "./selfie";
 import { resetRound, roundView, rosterReady } from "./rounds";
 import { applySelfCast, planCast } from "./selfcast";
@@ -450,7 +451,7 @@ export function publicView(room: Room) {
     bots: room.case
       ? room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: room.case!.characters.find((c) => c.id === p.characterId)?.name ?? p.name, avatarId: p.profile.avatarId }))
       : room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: p.name, avatarId: undefined })),
-    botLog: (room.botLog ?? []).slice(-25).map((l) => ({ id: l.id, botId: l.botId, speaker: l.speaker, text: l.text, kind: l.kind, to: l.to, phase: l.phase, audio: !!l.audioKey, ts: l.ts })),
+    botLog: (room.botLog ?? []).filter((l) => !l.toId).slice(-25).map((l) => ({ id: l.id, botId: l.botId, speaker: l.speaker, text: l.text, kind: l.kind, to: l.to, phase: l.phase, audio: !!l.audioKey, ts: l.ts })),
     botConfig: { chatter: room.botConfig?.chatter !== false, voice: room.botConfig?.voice !== false },
     speech: speechFor(room).kind,
     stt: usesLocal(room) ? "server" : "browser",
@@ -476,8 +477,8 @@ export function publicView(room: Room) {
 /** What the table said lately (chat and AI guests), replayed during the intermission. */
 function recapLines(room: Room) {
   const lines = [
-    ...(room.chat ?? []).map((m) => ({ id: m.id, who: m.name, text: m.text, bot: !!m.bot, botId: m.from, audio: false, ts: m.ts })),
-    ...(room.botLog ?? []).map((l) => ({ id: l.id, who: l.speaker, text: l.text, bot: true, botId: l.botId, audio: !!l.audioKey, ts: l.ts })),
+    ...(room.chat ?? []).filter((m) => !m.to).map((m) => ({ id: m.id, who: m.name, text: m.text, bot: !!m.bot, botId: m.from, audio: false, ts: m.ts })),
+    ...(room.botLog ?? []).filter((l) => !l.toId).map((l) => ({ id: l.id, who: l.speaker, text: l.text, bot: true, botId: l.botId, audio: !!l.audioKey, ts: l.ts })),
   ];
   const seen = new Set<string>();
   return lines.sort((a, b) => a.ts - b.ts).filter((l) => { const k = `${l.who}|${l.text}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(-8);
@@ -487,7 +488,9 @@ export function playerView(room: Room, p: Player) {
   const c = room.case?.characters.find((x) => x.id === p.characterId);
   return {
     ...publicView(room),
-    chat: chatView(room),
+    chat: chatView(room, p.id),
+    calls: callsView(room, p),
+    people: room.players.filter((x) => x.id !== p.id).map((x) => ({ id: x.id, name: x.name, isBot: !!x.isBot, canCall: x.ageGroup === "adult" && !x.isBot && x.hasDevice })),
     me: {
       id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, ballot: p.ballot, avatarId: p.profile.avatarId, drink: playerDrinkView(room, p),
       skippedIntermission: !!room.transition?.skip?.includes(p.id), canUndoReady: p.ready && !(room.readyUndo ?? []).includes(p.id), tracked: !p.isBot && p.hasDevice,

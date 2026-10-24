@@ -58,9 +58,9 @@ export async function uploadPhotoBlob(code: string, creds: Creds, blob: Blob, co
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Upload failed");
 }
 
-export type ChatLineView = { id: string; from: string; name: string; text: string; bot: boolean; ts: number };
-export const postChatMessage = (code: string, text: string, creds: Creds) =>
-  api<{ ok: true; reply?: BotLineView }>(`/api/rooms/${code}/chat`, { text }, credHeaders(creds));
+export type ChatLineView = { id: string; from: string; name: string; text: string; bot: boolean; ts: number; private?: boolean; to?: string; toName?: string };
+export const postChatMessage = (code: string, text: string, creds: Creds, to?: string) =>
+  api<{ ok: true; reply?: BotLineView }>(`/api/rooms/${code}/chat`, { text, ...(to ? { to } : {}) }, credHeaders(creds));
 
 export async function uploadSelfie(code: string, creds: Creds, blob: Blob, style: string, consent: "self" | "guardian") {
   const r = await fetch(`/api/rooms/${code}/selfie`, {
