@@ -2,7 +2,7 @@
 
 A funny whodunit party game for mixed-age groups: 10-20 adults (20-70) and 5-10 kids (1-15), about two hours. An AI Game Master builds the case, hands out secret character cards, runs the clues and twists, and is the only one who knows how it ends. Adults get cheeky secrets and optional sip-or-substitute drinking rules. Kids get real jobs, including being the victim who comes back as the Ghost Narrator.
 
-Everything is fiction. Anyone can say "Pass". Alcohol is always optional.
+Everything is fiction. Anyone can say "Pass". Alcohol is always opt-in (sips by default; an adults-only heavy drinking night with personal limits and tap-out is available).
 
 ## Two ways to play
 
@@ -25,6 +25,9 @@ Everything is fiction. Anyone can say "Pass". Alcohol is always optional.
 - **Local AI option:** for testing without cloud accounts, `services/local-ai` runs voices, chat, photo-to-character art and video in containers connected over MCP. Pick "Local services" per game in the setup wizard.
 - **Save and share stories:** teams can save a mystery (storyline only, or with its characters so new players pick who to be), share it by link or in a public gallery, add a spoiler-gated recap, and vote on the best ones. The solution stays sealed even from the replaying host.
 - **AI guests (bots):** the host can add AI characters that chat with players, chime in at story beats, and speak aloud through the selected cloud's speech service (Amazon Polly on AWS, Azure AI Speech on Azure, free browser voices by default). They only know their own card plus public clues.
+- **You stay you:** every player keeps their own name, pronouns and age group. The AI adds a public occupation and a private trait (Gambler, Engineer, Retired spy, ... plus one Murderer and one Murdered), an embellished life story (early life, comic love interests, hobbies, ambition), a portrait drawn to match, and a first-card briefing with an objective, places to start and a private digital notebook.
+- **Table talk and voice calls:** a group chat where AI guests answer when named, plus hands-free voice calls with barge-in (turn-taking over text; not speech-to-speech).
+- **Selfie booth:** photo styles such as wanted poster and film noir, shared on a wall and the TV. Raw selfies are deleted after use and are off for minors by default.
 - **Voice mode:** spoken roll call, cast announcement, and narration.
 - **Host Override Code:** nudge, advanced clue, accelerate, or the final answer if the game runs long.
 - **Registration wizard (web):** the host signs in, then sets the game's direction (theme, setting, tone, spice, drinking, must-include and avoid lists). Any blank prompt means the AI picks.

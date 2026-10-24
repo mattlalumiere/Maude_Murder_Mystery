@@ -29,6 +29,7 @@ export const joinGame = (code: string, b: unknown) => api<{ playerId: string; to
 export const sendAction = <T = Record<string, unknown>>(code: string, body: object, headers: Headers_ = {}) =>
   api<T>(`/api/rooms/${code}/action`, body, headers);
 export const runMedia = (code: string) => api(`/api/rooms/${code}/media/run`, {});
+export const runLife = (code: string) => api(`/api/rooms/${code}/life/run`, {});
 export const runGenerate = (code: string) => api(`/api/rooms/${code}/generate`, {});
 export type BotLineView = { id: string; botId: string; speaker: string; text: string; kind: "reply" | "chatter"; to?: string; phase: string; audio: boolean; ts: number };
 export type BotView = { id: string; name: string; characterName: string; avatarId?: string };
@@ -53,6 +54,18 @@ export async function uploadPhotoBlob(code: string, creds: Creds, blob: Blob, co
   const r = await fetch(`/api/rooms/${code}/photo`, {
     method: "POST", body: blob,
     headers: { ...credHeaders(creds), "x-consent": consent, "content-type": "image/jpeg" },
+  });
+  if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Upload failed");
+}
+
+export type ChatLineView = { id: string; from: string; name: string; text: string; bot: boolean; ts: number };
+export const postChatMessage = (code: string, text: string, creds: Creds) =>
+  api<{ ok: true; reply?: BotLineView }>(`/api/rooms/${code}/chat`, { text }, credHeaders(creds));
+
+export async function uploadSelfie(code: string, creds: Creds, blob: Blob, style: string, consent: "self" | "guardian") {
+  const r = await fetch(`/api/rooms/${code}/selfie`, {
+    method: "POST", body: blob,
+    headers: { ...credHeaders(creds), "x-consent": consent, "x-style": style, "content-type": "image/jpeg" },
   });
   if (!r.ok) throw new Error(((await r.json().catch(() => ({}))) as { error?: string }).error ?? "Upload failed");
 }
@@ -109,7 +122,7 @@ export function friendlyError(msg: string): string {
   return m;
 }
 
-export type WizardInput = { expected: { adults: number; kids: number; toddlers: number }; bots?: number; overrideCode: string; budget: number };
+export type WizardInput = { expected: { adults: number; kids: number; toddlers: number }; bots?: number; drinking?: string; attested?: boolean; overrideCode: string; budget: number };
 export const WIZARD_STEPS = ["Guests", "Story", "Pictures", "Secret code"] as const;
 
 export function wizardProgress(step: number, total: number) {
@@ -124,6 +137,7 @@ export function validateWizardStep(step: number, v: WizardInput): string {
     const n = v.expected.adults + v.expected.kids + v.expected.toddlers + bots;
     if (!Number.isFinite(n) || n < 4) return "Plan for at least 4 guests so everyone gets a part. AI guests count too.";
     if (v.expected.adults + bots < 2) return "At least 2 grown-ups are needed (AI guests count as grown-ups).";
+    if (v.drinking === "heavy" && !v.attested) return "Confirm the drinking-age statement to use the heavy drinking night.";
   }
   if (step === 3 && (!Number.isFinite(v.budget) || v.budget < 0)) return "Enter a budget of 0 or more.";
   if (step === 4 && v.overrideCode.trim().length < 4) return "Your secret code needs at least 4 characters.";

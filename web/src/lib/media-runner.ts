@@ -48,7 +48,8 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
   try {
     const room = (await getStore().get(code))!;
     const refs: Buffer[] = [];
-    for (const pid of job.playerIds) {
+    if (job.kind === "selfie") { const b = await loadPhoto(job.refKey); if (b) refs.push(b); }
+    else for (const pid of job.playerIds) {
       const p = room.players.find((x) => x.id === pid);
       if (p && p.profile.consent !== "none") { const b = await loadPhoto(p.profile.photoKey); if (b) refs.push(b); }
     }
@@ -66,10 +67,10 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
       }
     } else {
       // Local services: a prompt director writes a prompt that fits this character and the story, and the photo goes in as the reference.
-      const directed = usesLocal(room) ? await directPrompt(room, job, textModelFor(room)) : null;
+      const directed = usesLocal(room) && job.kind !== "selfie" ? await directPrompt(room, job, textModelFor(room)) : null;
       const g = await imageModelFor(room).generate({
         prompt: directed?.prompt ?? job.prompt, caption: job.caption, refs, quality: room.budget.plan.quality,
-        shape: job.kind === "avatar" ? "square" : "wide", negative: directed?.negative, strength: directed?.strength,
+        shape: job.kind === "avatar" || job.kind === "selfie" ? "square" : "wide", negative: directed?.negative ?? (job.kind === "selfie" ? "gore, blood, nudity, scary, text, watermark" : undefined), strength: job.kind === "selfie" ? 0.6 : directed?.strength,
       });
       out = { kind: "done", bytes: g.bytes, mime: g.mime, prompt: directed?.prompt };
     }
@@ -77,6 +78,8 @@ export async function runNext(code: string): Promise<{ ran: boolean; item?: Pick
     out = { kind: "failed", note: `Generation failed: ${(e as Error).message}`.slice(0, 200) };
   }
 
+  // A selfie's raw photo is only a reference: it is deleted as soon as the job has ended.
+  if (job.kind === "selfie" && job.refKey && out.kind !== "polling") await getMediaStore().deletePrefix(job.refKey).catch(() => {});
   let key: string | undefined;
   if (out.kind === "done") {
     key = `${code}/gen/${job.id}.${ext(out.mime)}`;

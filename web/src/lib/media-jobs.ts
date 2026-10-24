@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { pricesForRoom } from "./ai/route";
+import { portraitLook } from "./backstory";
 import { imageCost, SCENE_PHASES, VIDEO_PHASES, videoCost } from "./budget";
 import type { MediaItem, Phase, Player, Room } from "./types";
 import { PHASE_INFO } from "./types";
@@ -13,15 +14,17 @@ function push(room: Room, m: Omit<MediaItem, "id" | "status" | "createdAt">) {
 const charOf = (room: Room, p: Player) => room.case!.characters.find((c) => c.id === p.characterId);
 const hasRef = (p: Player) => !!p.profile.photoKey && p.profile.consent !== "none";
 
-export function queueAvatars(room: Room) {
+export function queueAvatars(room: Room, only?: Player[]) {
   const plan = room.budget.plan;
   if (!plan.avatars) return;
-  for (const p of room.players) {
+  for (const p of only ?? room.players) {
     const c = charOf(room, p);
     if (!c) continue;
+    if (room.media.some((m) => m.kind === "avatar" && m.playerIds[0] === p.id)) continue; // one portrait per player
+    // No names go to image models: the occupation and the public look are enough.
     push(room, {
       kind: "avatar", phase: "cards", playerIds: [p.id], caption: c.name,
-      prompt: `${STYLE} Friendly head-and-shoulders portrait of ${c.name}, ${c.tease} ${c.kid ? "A child character, G-rated." : "An adult character."}`,
+      prompt: `${STYLE} Friendly head-and-shoulders portrait of a ${c.title ?? "party guest"}: ${portraitLook(c)}. ${c.kid ? "A child character, G-rated." : "An adult character."}`,
       estCostUsd: imageCost(plan.quality, pricesForRoom(room)),
     });
   }
@@ -44,7 +47,7 @@ export function queuePhaseMedia(room: Room, phase: Phase) {
   const k = room.case!;
   const setting = k.setting.split(/(?<=[.!?])\s/)[0] ?? "";
   const scene = (extra: string, who: Player[]) => {
-    const cast = who.map((p) => { const c = charOf(room, p); return c ? `${c.name} (${c.tease})` : ""; }).filter(Boolean).join("; ");
+    const cast = who.map((p) => { const c = charOf(room, p); return c ? `a ${c.title ?? "guest"} (${portraitLook(c)})` : ""; }).filter(Boolean).join("; ");
     return `${STYLE} ${setting} ${extra} Featuring: ${cast}.`.slice(0, 1000);
   };
   const beat: Partial<Record<Phase, string>> = {

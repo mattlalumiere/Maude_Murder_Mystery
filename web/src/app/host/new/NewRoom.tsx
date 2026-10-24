@@ -57,7 +57,7 @@ export default function NewRoom() {
   const est = localAi ? { lines: [{ label: "Local services (no per-picture cost)", usd: 0 }], total: 0 } : estimate(activePlan, players);
   const over = est.total > budget;
   const set = <K extends keyof GameConfig>(k: K, v: GameConfig[K]) => setCfg((c) => ({ ...c, [k]: v }));
-  const input = { expected: cfg.expected, bots: botCount, overrideCode: code, budget };
+  const input = { expected: cfg.expected, bots: botCount, drinking: cfg.drinking, attested: cfg.drinkingAttested === true, overrideCode: code, budget };
   const total = WIZARD_STEPS.length;
   const prog = wizardProgress(step, total);
 
@@ -134,11 +134,22 @@ export default function NewRoom() {
                 <option value="mild">Mild (cheeky)</option><option value="medium">Medium (innuendo)</option><option value="spicy">Spicy-ish (PG-13+, adult cards only)</option>
               </select>
             </Field>
-            <Field label="Drinking" hint="Always optional, with a non-alcohol swap.">
+            <Field label="Drinking" hint={cfg.drinking === "heavy" ? "Grown-ups opt in and set their own limit. Kids never take part." : "Always optional, with a non-alcohol swap."}>
               <select value={cfg.drinking} data-testid="field-drinking" onChange={(e) => set("drinking", e.target.value as GameConfig["drinking"])}>
-                <option value="adults">Optional sips for grown-ups</option><option value="none">Alcohol-free game</option>
+                <option value="adults">Optional sips for grown-ups</option><option value="heavy">Heavy drinking night (grown-ups only)</option><option value="none">Alcohol-free game</option>
               </select>
             </Field>
+            {cfg.drinking === "heavy" && (
+              <div data-testid="heavy-warning">
+                <Notice>
+                  Heavy night: drink prompts are real drinks, every round of the game, for grown-ups who opt in. Each person picks a personal limit (2 to 6 standard drinks for the night) and the game stops prompting them at it. They can tap out any time with no penalty, mocktails count the same, there is a water and snack break, a pace guard, and a host stop button. Children, teens and AI guests are never part of it.
+                </Notice>
+                <label className="sc-check">
+                  <input type="checkbox" checked={cfg.drinkingAttested === true} onChange={(e) => set("drinkingAttested", e.target.checked)} data-testid="heavy-attest" />
+                  <span>I confirm everyone who will drink is of legal drinking age where we are and chooses to take part, and that we will arrange safe rides home.</span>
+                </label>
+              </div>
+            )}
           </Card>
         </div>
       )}
@@ -243,7 +254,7 @@ export default function NewRoom() {
           </Card>
           <Card title="Summary" data-testid="summary">
             <ul className="clean">
-              <li>{cfg.name || "Party name: GM's pick"}, {cfg.lengthMin} min, {cfg.spice}, {cfg.drinking === "none" ? "alcohol-free" : "optional sips"}</li>
+              <li>{cfg.name || "Party name: GM's pick"}, {cfg.lengthMin} min, {cfg.spice}, {cfg.drinking === "none" ? "alcohol-free" : cfg.drinking === "heavy" ? "heavy drinking night" : "optional sips"}</li>
               <li>About {players} players ({cfg.expected.adults} grown-ups, {cfg.expected.kids} kids, {cfg.expected.toddlers} little ones{botCount ? `, ${botCount} AI guest${botCount === 1 ? "" : "s"}` : ""})</li>
               <li>Budget {formatUsd(budget || 0)}, estimate {formatUsd(est.total)}</li>
             </ul>

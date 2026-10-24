@@ -1,6 +1,6 @@
 import { hostIdFromSession } from "@/auth";
 import { textModelFor } from "@/lib/ai/route";
-import { addBots, addPlayer, advance, authPlayer, beginGeneration, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
+import { addBots, addPlayer, advance, authPlayer, beginGeneration, drinkAnswer, drinkControl, drinkDone, drinkLog, drinkWater, kickPlayer, override, photosCanBePurged, purgePhotos, removePhoto, saveNotes, setBotConfig, setPlan, startGame, submitBallot, type OverrideCmd } from "@/lib/engine";
 import { handle, json } from "@/lib/http";
 import { getStore, HttpError, mutate } from "@/lib/store";
 import type { AgeGroup, Ballot, MediaPlan } from "@/lib/types";
@@ -15,12 +15,16 @@ type Body =
   | { type: "setPlan"; plan?: Partial<MediaPlan>; capUsd?: number }
   | { type: "addBots"; count: number; style?: string }
   | { type: "setBotConfig"; chatter?: boolean; voice?: boolean }
+  | { type: "drink"; promptId: string; answer: "drank" | "tapped" }
+  | { type: "logDrink" | "water" | "doneForNight" }
+  | { type: "drinkControl"; op: string }
   | { type: "purgePhotos" }
   | { type: "removePhoto" }
+  | { type: "saveNotes"; notes: string }
   | { type: "ready" }
   | { type: "ballot"; ballot: Ballot };
 
-const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos", "addBots", "setBotConfig"]);
+const HOST_ACTIONS = new Set(["start", "advance", "pause", "resume", "addPlayer", "kick", "override", "setPlan", "purgePhotos", "addBots", "setBotConfig", "drinkControl"]);
 
 export async function POST(req: Request, ctx: { params: Promise<{ code: string }> }) {
   return handle(async () => {
@@ -58,8 +62,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ code: string }
         case "setPlan": setPlan(room, body.plan, body.capUsd); break;
         case "addBots": addBots(room, body.count, body.style); break;
         case "setBotConfig": setBotConfig(room, body); break;
+        case "drink": drinkAnswer(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.promptId, body.answer); break;
+        case "logDrink": drinkLog(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "water": drinkWater(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "doneForNight": drinkDone(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "drinkControl": drinkControl(room, body.op); break;
         case "purgePhotos": await purgePhotos(room); break;
         case "removePhoto": await removePhoto(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token"))); break;
+        case "saveNotes": saveNotes(authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.notes); break;
         case "ready": authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")).ready = true; break;
         case "ballot": submitBallot(room, authPlayer(room, req.headers.get("x-player-id"), req.headers.get("x-player-token")), body.ballot); break;
         default: throw new HttpError(400, "Unknown action");

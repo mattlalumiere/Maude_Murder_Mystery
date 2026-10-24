@@ -38,7 +38,10 @@ Murder Mystery Night is a party game for mixed-age groups (10-20 adults aged 20-
 | `web/src/lib/ai/speech*.ts` | Speech port and adapters (browser, mock, Polly, Azure, OpenAI-compatible), chosen by `SPEECH_ADAPTER` or `CLOUD_PROVIDER` |
 | `web/src/lib/sanitize.ts` | Input clamping for config, plan, and player profile |
 | `web/src/lib/gm-ai.ts` | Bedrock case generation with fallback to `sample-case.ts` |
-| `web/src/lib/sample-case.ts` | Built-in sample case ("The Last Toast at Gus Pennywhistle's 70th") |
+| `web/src/lib/selfcast.ts`, `traits.ts` | Self-cast: players keep their own names; a cast plan picks killer, victim and traits; `caseTemplate` keeps saved stories free of real names |
+| `web/src/lib/backstory.ts`, `life.ts` | Per-player life story, portrait look and briefing (AI with template fallback), run by a worker the host tab drives |
+| `web/src/lib/chat.ts`, `selfie.ts` | Table chat (G-rated, rate limited, AI guests answer when named) and the selfie booth (style prompts, per-player and budget limits) |
+| `web/src/lib/sample-case.ts` | Built-in sample case ("The Last Toast at the Pennywhistle Estate", a token template: `{{P#}}` slots become real player names at casting) |
 | `web/sst.config.ts` | AWS infrastructure (SST v3): Lambda via OpenNext, DynamoDB with TTL, S3 |
 | `dryrun/` | Local sample Vault from a dry run. Git-ignored. Contains spoilers |
 
@@ -67,7 +70,9 @@ Local dev needs `web/.env.local` with `AUTH_SECRET` and `ALLOW_DEV_LOGIN=true` (
 ### Safety and tone (from `SKILL.md`)
 - All secrets are fictional. Never base them on real people's lives or relationships.
 - Kids' content is G-rated. Kids and toddlers never take part in alcohol mechanics.
-- Alcohol is always optional with a substitute (sips only, no shots, water rounds).
+- Alcohol is always opt-in. Default is sips with a substitute. The heavy drinking night (`drinking: "heavy"`) is adults only, needs the host's legal-age attestation, per-player opt-in and personal limit (2 to 6 standard drinks), tap-out and "done for the night" with no penalty, a pace guard (2 per 15 minutes), a water intermission, and host pause and stop. Never target a child, teen, bot, opted-out or at-limit player with a drink prompt, never expose anyone's tally on the shared screen, and never add chugging, forced shots, or elimination rules. `web/src/lib/drinks.ts` and `scripts/drinks.test.ts` hold the contract.
+- Players keep their own name, pronouns and age group. Never let a model rename or re-gender anyone. Traits stay free of sexual abuse and sex work (children play). Image prompts contain titles and looks, never real names.
+- Selfies: the raw photo is a one-time reference and is deleted when its job ends; selfies of players under 18 follow `ALLOW_MINOR_PHOTOS`; only the generated picture is public. The notebook (`player.notes`) is private to its owner and never in any other view.
 - Anyone can say "Pass". The `SAFE` command must always be honored.
 - Photos: explicit consent (guardian for under 18), moderation before storage, never served to other players (only generated art is public), 1-day expiry, deletable on request. Never put photo keys in any view.
 - Spend: every paid generation must go through `claim()` in `media-runner.ts` so the hard cap and reservation accounting apply. Never call Bedrock image or video APIs directly from a route.

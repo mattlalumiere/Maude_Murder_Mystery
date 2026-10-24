@@ -21,7 +21,8 @@ export function sanitizeConfig(i: Partial<GameConfig> | undefined): GameConfig {
     },
     lengthMin: len,
     spice,
-    drinking: x.drinking === "none" ? "none" : "adults",
+    drinking: x.drinking === "none" ? "none" : x.drinking === "heavy" ? "heavy" : "adults",
+    drinkingAttested: x.drinkingAttested === true,
     themePrompt: clean(x.themePrompt, LIMITS.configPrompt),
     settingPrompt: clean(x.settingPrompt, LIMITS.configPrompt),
     tonePrompt: clean(x.tonePrompt, LIMITS.configTone),
@@ -45,6 +46,7 @@ export function sanitizePlan(i: Partial<MediaPlan> | undefined, prev?: MediaPlan
 }
 
 export function sanitizeProfile(i: Partial<PlayerProfile> | undefined, allowBackstory: boolean): PlayerProfile {
+  const d = i?.drink;
   const x = i ?? {};
   const mode = allowBackstory && (x.backstoryMode === "hint" || x.backstoryMode === "own") ? x.backstoryMode : "gm";
   const backstory = mode === "gm" ? "" : clean(x.backstory, LIMITS.backstory);
@@ -52,6 +54,7 @@ export function sanitizeProfile(i: Partial<PlayerProfile> | undefined, allowBack
     backstoryMode: backstory ? mode : "gm",
     backstory,
     consent: x.consent === "self" || x.consent === "guardian" ? x.consent : "none",
+    ...(d && (d.mode === "in" || d.mode === "out") ? { drink: { mode: d.mode, limit: Math.min(6, Math.max(2, Math.round(Number(d.limit)) || 4)) } } : {}),
   };
 }
 

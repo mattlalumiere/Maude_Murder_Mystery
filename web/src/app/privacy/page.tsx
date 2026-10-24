@@ -21,17 +21,27 @@ export default function Privacy() {
         <li>Photos are meant to be deleted within 24 hours (the host&apos;s setup should enforce this), or sooner when the host or you delete them. The cartoon pictures expire with the game.</li>
       </ul>
 
+      <h2>Selfie booth</h2>
+      <ul>
+        <li>A selfie is only used once, as a reference to make a funny AI picture (a wanted poster, a film noir detective, and so on). It is stripped of hidden details, safety-checked, and <b>deleted as soon as the picture is made</b>.</li>
+        <li>The funny picture is shown to everyone in the game and on the TV, and expires with the game. Your original selfie is never shown. Names are never sent to the image service.</li>
+        <li>Selfies are off for anyone under 18 unless the host turned photo likenesses on for the event and a parent or guardian agrees.</li>
+      </ul>
+
       <h2>Children</h2>
       <p>By default, photo likenesses are turned <b>off</b> for anyone under 18. If the host turns them on for the event, a parent or guardian must agree for each child. Children can always play with no photo and a cartoon character the GM invents.</p>
 
       <h2>AI guests and voices</h2>
-      <p>The host can add AI guests. What you type to them is sent to the AI service the host has configured, along with their character card and the clues everyone has seen, and never other players&apos; secrets. When cloud voices are on, their replies are turned into speech by the host&apos;s cloud voice service. The &quot;Speak&quot; button, offered to grown-ups only, uses your browser&apos;s built-in speech recognition, which may send your voice to the browser&apos;s maker (for example Google or Apple). Children can type but not speak to the AI guests. Chat lines are kept only for the length of the game.</p>
+      <p>The host can add AI guests. What you type to them is sent to the AI service the host has configured, along with their character card and the clues everyone has seen, and never other players&apos; secrets. When cloud voices are on, their replies are turned into speech by the host&apos;s cloud voice service. The &quot;Speak&quot; button, offered to grown-ups only, uses your browser&apos;s built-in speech recognition, which may send your voice to the browser&apos;s maker (for example Google or Apple). Children can type but not speak to the AI guests. The table chat is readable by everyone in the game and is kept only for the length of the game. Voice calls use the same speech services as the Speak button, so they follow the same rules: grown-ups only. Chat lines are kept only for the length of the game.</p>
 
       <h2>Saved and shared stories</h2>
       <p>A host can save a game&apos;s story to share it. The saved mystery is sealed so replayers cannot read the answer. If the host adds a recap, it may show the story, clues, scores and awards. The recap uses character names by default; real names and the game&apos;s pictures are only included for link-only stories when the host chooses them, and never for public stories. Saved stories stay until the host deletes them. Votes are counted without names.</p>
 
       <h2>Local AI mode</h2>
       <p>If the host chose local AI services, chat, voices, pictures and video are produced by software running on the host&apos;s own computer, and photos and voice recordings are not sent to a cloud service for that game. Voice input in this mode is recorded for a few seconds, transcribed locally, and discarded.</p>
+
+      <h2>Heavy drinking night</h2>
+      <p>If the host chose the heavy drinking night, grown-ups can opt in with a personal limit. Your choice and your self-reported drink count are stored for the length of the game, shown only to you and the host, and never on the shared screen. Children and teenagers are never part of it. This is not medical advice: eat, drink water, and do not drive.</p>
 
       <h2>Who else sees your data</h2>
       <p>Your text and photo are sent to the AI and cloud services the host has configured for this game (for example AWS Bedrock, Rekognition, and S3) only to run the game. We do not sell data or use it to train models.</p>

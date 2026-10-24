@@ -376,7 +376,7 @@ describe("scoring and reveal", () => {
   it("shows the reveal only in the reveal phase", async () => {
     const room = await playTo(() => null);
     const v = publicView(room);
-    expect(v.reveal?.killer).toBe("Carol Greenthumb");
+    expect(v.reveal?.killer).toBe(room.players.find((p) => p.characterId === room.case!.killerId)!.name); // players keep their own names
     expect(v.reveal?.story).toBe(room.case!.truth.story);
     const early = await startedRoom();
     expect(publicView(early).reveal).toBeUndefined();
@@ -424,7 +424,7 @@ describe("Host Override Code", () => {
     expect(ask.needsConfirm).toBe(true);
     expect(room.overrideUsed).toBe(false);
     const done = override(room, "swordfish", "FINAL", true);
-    expect(done.message).toContain("Carol Greenthumb");
+    expect(done.message).toContain(room.players.find((p) => p.characterId === room.case!.killerId)!.name);
     expect(done.message).toContain(room.case!.truth.story);
     expect(room.phase).toBe("act2");
     expect(room.overrideUsed).toBe(true);

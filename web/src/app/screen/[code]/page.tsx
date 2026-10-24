@@ -1,4 +1,6 @@
 "use client";
+import { DrinkBoard } from "@/components/DrinkUi";
+import { LaunchProgress } from "@/components/LaunchProgress";
 import { RulesCard } from "@/components/RulesCard";
 import { use } from "react";
 import type { ScreenState } from "@/app/_views";
@@ -45,6 +47,7 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
           </div>
           <Qr text={joinUrl} size={380} className="sc-tv-qr" testId="tv-qr" />
         </div>
+        {state.launch && <LaunchProgress launch={state.launch} title="The host has started the game" big />}
         <section aria-label="Guests who have arrived" data-testid="tv-guests">
           <ul className="sc-tv-names">{state.lobbyNames.map((n, i) => <li key={`${n}-${i}`}>{plainText(n)}</li>)}</ul>
           {state.lobbyNames.length === 0 && <p className="sc-tv-url">Waiting for the first guest...</p>}
@@ -69,6 +72,8 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
           {state.narration && <p className="sc-tv-narr" data-testid="tv-narration">{plainText(state.narration)}</p>}
           {(state.phase === "cards" || state.phase === "act1") && <RulesCard drinking={state.drinking} big />}
           {state.ballotsOpen && <p className="sc-tv-votes" data-testid="tv-ballots" role="status">Accusations in: {state.ballotsIn} of {state.totalPlayers}</p>}
+          {state.phase === "cards" && state.launch && <LaunchProgress launch={state.launch} big />}
+          <DrinkBoard drink={state.drink} big />
           <BotChatter code={code} lines={state.botLog} bots={state.bots} big />
           {hero && !state.reveal && <div className="sc-tv-hero" style={{ marginTop: "var(--space-4)" }}><MediaView code={code} m={hero} /></div>}
         </div>
@@ -88,6 +93,12 @@ export default function Screen({ params }: { params: Promise<{ code: string }> }
           </section>
         )}
       </div>
+
+      {(state.selfies?.length ?? 0) > 0 && (
+        <section aria-label="Selfie wall" data-testid="tv-selfies" style={{ display: "flex", gap: "var(--space-4)", overflowX: "auto", margin: "var(--space-4) 0" }}>
+          {state.selfies!.slice(-6).map((m) => <div key={m.id} style={{ width: 180, flex: "none" }}><MediaView code={code} m={{ id: m.id, kind: "selfie", phase: "", caption: m.caption }} /></div>)}
+        </section>
+      )}
 
       <section aria-label="The cast" data-testid="tv-cast">
         <ul className="sc-tv-cast">

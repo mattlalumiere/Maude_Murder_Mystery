@@ -12,6 +12,7 @@ import { usesLocal } from "../src/lib/ai/mode";
 import { addBots, addPlayer, advance, createRoom, startGame } from "../src/lib/engine";
 import { runBotChat } from "../src/lib/bots";
 import { runNext } from "../src/lib/media-runner";
+import { runLifeTick } from "../src/lib/life";
 import { getMediaStore } from "../src/lib/media-store";
 import { directPrompt, templatePrompt } from "../src/lib/prompt-director";
 import { getStore, mutate } from "../src/lib/store";
@@ -59,6 +60,7 @@ async function main() {
     let room = await load(r.code);
     assert.equal(room.caseSource, "sample", "mock chat cannot write a case, so the built-in story is used");
 
+    for (let i = 0; i < 20 && (await load(r.code)).life?.queue.length; i++) await runLifeTick(r.code);
     for (let i = 0; i < 20; i++) if (!(await runNext(r.code)).ran) break;
     room = await load(r.code);
     const hana = room.players.find((p) => p.name === "Hana")!;
@@ -69,7 +71,8 @@ async function main() {
     const meta = pngText((await getMediaStore().get(avatar.key!))!.bytes);
     assert.equal(meta.had_reference, "1", "the uploaded photo reached the diffusion model");
     assert.equal(meta.strength, "0.6");
-    assert.ok(meta.prompt.includes(ch.name) && meta.prompt.includes(ch.tease.replace(/\.$/, "")), "prompt is written for this character");
+    assert.ok(!meta.prompt.includes(ch.name), "no player names reach the image model");
+    assert.ok(ch.title && meta.prompt.includes(ch.title), "prompt is written for this character's occupation");
     assert.ok(meta.prompt.toLowerCase().includes(room.case!.setting.split(" ")[0].toLowerCase()) || meta.prompt.includes("Pennywhistle"), "prompt carries the story setting");
     assert.ok(meta.prompt.includes("reference photo"), "prompt asks to keep the person recognisable");
     assert.ok(meta.negative_prompt.includes("gore"));

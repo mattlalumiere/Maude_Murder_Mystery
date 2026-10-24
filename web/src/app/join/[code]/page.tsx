@@ -19,6 +19,7 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
   const [name, setName] = useState("");
   const [age, setAge] = useState<AgeGroup>("adult");
   const [wantsVictim, setWV] = useState(false);
+  const [pronouns, setPronouns] = useState<"he" | "she" | "they">("they");
   const [mode, setMode] = useState<Mode>("gm");
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState<{ blob: Blob | null; consent: "self" | "guardian" | null }>({ blob: null, consent: null });
@@ -35,12 +36,18 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
   }, [code]);
 
   const toddler = age === "little";
-  const ok = canJoin({ name, age, mode, text, photoBlob: !!photo.blob, photoConsent: !!photo.consent });
+  // Heavy drinking night: grown-ups must choose in or out (no default), and pick a personal limit if in.
+  const [heavy, setHeavy] = useState(false);
+  const [drinkMode, setDrinkMode] = useState<"" | "in" | "out">("");
+  const [drinkLimit, setDrinkLimit] = useState(4);
+  useEffect(() => { api<{ drinking?: string }>(`/api/rooms/${code}/state?role=screen`).then((s) => setHeavy(s.drinking === "heavy")).catch(() => setHeavy(false)); }, [code]);
+  const needsDrink = heavy && age === "adult";
+  const ok = canJoin({ name, age, mode, text, photoBlob: !!photo.blob, photoConsent: !!photo.consent }) && (!needsDrink || drinkMode !== "");
 
   async function join() {
     const r = await run(() => joinGame(code, {
-      name: name.trim(), ageGroup: age, wantsVictim, ...(choice ? { characterChoice: choice } : {}),
-      profile: { backstoryMode: toddler ? "gm" : mode, backstory: mode === "gm" || toddler ? "" : text },
+      name: name.trim(), ageGroup: age, wantsVictim, pronouns, ...(choice ? { characterChoice: choice } : {}),
+      profile: { backstoryMode: toddler ? "gm" : mode, backstory: mode === "gm" || toddler ? "" : text, ...(needsDrink ? { drink: { mode: drinkMode, limit: drinkLimit } } : {}) },
     }));
     if (!r) return;
     const creds = { pid: r.playerId, tok: r.token };
@@ -69,6 +76,11 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
               <option value="adult">Grown-up</option><option value="teen">Teen (13 to 15)</option><option value="kid">Kid (6 to 12)</option><option value="little">Little one (1 to 5), a grown-up helps</option>
             </select>
           </Field>
+          <Field label="How should the story refer to you?" hint="Your name and this choice are never changed. The story gives you a job and a secret, not a new identity.">
+            <select value={pronouns} data-testid="join-pronouns" onChange={(e) => setPronouns(e.target.value as "he" | "she" | "they")}>
+              <option value="they">They / them</option><option value="she">She / her</option><option value="he">He / him</option>
+            </select>
+          </Field>
           {(age === "kid" || age === "teen") && (
             <label className="sc-check">
               <input type="checkbox" checked={wantsVictim} data-testid="join-victim" onChange={(e) => setWV(e.target.checked)} />
@@ -76,6 +88,19 @@ export default function JoinBuilder({ params }: { params: Promise<{ code: string
             </label>
           )}
         </Card>
+        {needsDrink && (
+          <Card title="Tonight's drinking" data-testid="join-drinking">
+            <p className="muted" style={{ marginTop: 0 }}>This is a heavy drinking night. Choose how you want to play. You can tap out of any round, change your mind, or stop for the night from your phone.</p>
+            <label className="sc-check"><input type="radio" name="drink" checked={drinkMode === "in"} onChange={() => setDrinkMode("in")} data-testid="drink-in" /><span><b>I am in.</b> Real drinks at the game prompts, up to my own limit.</span></label>
+            <label className="sc-check"><input type="radio" name="drink" checked={drinkMode === "out"} onChange={() => setDrinkMode("out")} data-testid="drink-out" /><span><b>Mocktails and water.</b> I join every round without alcohol.</span></label>
+            {drinkMode === "in" && (
+              <Field label={`My limit for the night: ${drinkLimit} standard drinks`} hint="One standard drink is a 12 oz beer, a 5 oz wine, or 1.5 oz of spirits. The game stops prompting you at your limit.">
+                <input type="range" min={2} max={6} step={1} value={drinkLimit} onChange={(e) => setDrinkLimit(+e.target.value)} data-testid="drink-limit-range" />
+              </Field>
+            )}
+            <p className="muted" style={{ fontSize: "var(--text-xs)", marginBottom: 0 }}>Please only choose &quot;in&quot; if you are of legal drinking age, and arrange a ride home. Never drive after drinking.</p>
+          </Card>
+        )}
         {options && (
           <Card title="Choose your character" data-testid="join-characters">
             <p className="muted" style={{ marginTop: 0 }}>Pick who you want to be, or leave it to the Game Master. Characters other players already asked for are greyed out. {age === "adult" ? "Showing grown-up characters." : "Showing young characters."}</p>

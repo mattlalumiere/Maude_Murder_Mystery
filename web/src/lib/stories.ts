@@ -6,6 +6,7 @@
 import { createCipheriv, createDecipheriv, createHash, hkdfSync, randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { cleanLine } from "./bots";
+import { resolveTokens } from "./selfcast";
 import { PHASES, type CaseFile, type Phase, type Room } from "./types";
 import { createMediaStore } from "./storage";
 import { HttpError } from "./storage";
@@ -103,7 +104,8 @@ export function packFromCase(k: CaseFile): CaseFile {
   return c;
 }
 
-const castPreview = (k: CaseFile): CastPreview[] => k.characters.map((c) => ({ id: c.id, name: c.name, house: c.house, tease: c.tease, kid: c.kid }));
+/** The cast as shown to people choosing a role. Names are tokens in a saved story, so roles are shown by occupation. */
+const castPreview = (k: CaseFile): CastPreview[] => k.characters.map((c) => ({ id: c.id, name: c.title || "Guest", house: c.house, tease: resolveTokens(c.tease, {}, "someone"), kid: c.kid }));
 
 export interface SaveOptions {
   kind: StoryKind; visibility: Visibility; title?: string; blurb?: string;
@@ -132,7 +134,8 @@ export async function saveStory(room: Room, hostId: string, o: SaveOptions): Pro
   const recapNames = includeRecap && o.recapNames && !pub;
   const recapPictures = includeRecap && o.recapPictures && !pub;
 
-  const pack = packFromCase(k);
+  // Saved stories keep the name tokens, never the real names of tonight's players.
+  const pack = packFromCase(room.caseTemplate ?? k);
   const id = `ST${randomBytes(5).toString("hex")}`;
   const sealedBlob = sealJson(pack, id);
   if (sealedBlob.length > STORY_LIMITS.maxPackBytes) throw new HttpError(413, "This story is too large to save");
@@ -176,11 +179,15 @@ import { getMediaStore } from "./media-store";
 const getMediaStoreForGame = () => getMediaStore();
 
 function buildRecap(room: Room, names: boolean): Recap {
-  const k = room.case!;
+  // Without real names the story is retold with roles ("The Caterer"), built from the token version of the story.
+  const tpl = room.caseTemplate ?? room.case!;
+  const anon: Record<string, string> = {};
+  for (const c of tpl.characters) anon[c.slot ?? c.id] = `The ${c.title ?? "guest"}`;
+  const k = names ? room.case! : resolveTokens(tpl, anon);
   const who = (id: string) => room.players.find((p) => p.id === id);
   const label = (p: { id: string; name: string; characterId?: string; isBot?: boolean }) => {
     const ch = k.characters.find((c) => c.id === p.characterId)?.name ?? "A guest";
-    return names && !p.isBot ? `${p.name} as ${ch}` : p.isBot ? `${ch} (AI guest)` : ch;
+    return names && !p.isBot ? p.name : p.isBot ? `${ch} (AI guest)` : ch;
   };
   const r = room.result;
   const clues = [...k.clues, { id: "twist", round: 2 as const, text: k.twist }].filter((c) => room.releasedClueIds.includes(c.id)).map((c) => c.text);
@@ -191,7 +198,7 @@ function buildRecap(room: Room, names: boolean): Recap {
     clues,
     reveal: r ? {
       killer: k.characters.find((c) => c.id === r.killerId)?.name ?? "",
-      method: k.methods.find((m) => m.id === r.methodId)?.text ?? "", motive: k.motives.find((m) => m.id === r.motiveId)?.text ?? "", story: r.story,
+      method: k.methods.find((m) => m.id === r.methodId)?.text ?? "", motive: k.motives.find((m) => m.id === r.motiveId)?.text ?? "", story: names ? r.story : resolveTokens(tpl.truth.story, anon),
     } : undefined,
     scores: (r?.scores ?? []).map((s) => { const p = who(s.playerId); return { name: p ? label(p) : "A guest", points: s.points }; }),
     awards: (r?.awards ?? []).map((a) => ({ award: a.award, to: nameForAward(a.to) })),

@@ -59,6 +59,15 @@ Running late? Trim a dare. Never trim the reveal. Or use the override (below).
 - In Act IV, submit a secret accusation on your phone: who did it, how, and why.
 - Scoring: killer 3, method 1, motive 1. The killer scores 5 for escaping if fewer than half the votes are right.
 
+## Your character, notebook, chat and selfies (web app)
+
+- **You stay you.** Your name, pronouns and age group never change. The story gives you an invented public job (like "Opera fan") and a private trait (like Gambler, Engineer, Retired spy or Whistleblower). One player is secretly the **Murderer** and one is the **Murdered**. Pick "She / He / They" when you join and the story will use it. Traits never involve anything unsuitable for children, so there is no trait about sexual abuse or sex work.
+- **Your first card is a briefing:** your objective, two or three places to start (people or clues to approach first), and what to keep notes on. Below it is your **life story**: an eventful early life, comic love interests, hobbies and an ambition, all invented and matched to the theme. Your portrait is drawn to match it.
+- **Detective notebook:** a private notepad on your phone. It saves to the server and to your phone, and nobody else (not even the host) can read it.
+- **Table talk:** a chat for the whole table. Say an AI guest's first name ("Beatrice, where were you?") and they answer in the chat and by voice. The chat is G-rated and rate limited.
+- **Voice call (grown-ups):** tap **Call** for a hands-free conversation with an AI guest. You speak, they answer aloud, and you can interrupt them if you wear headphones (without headphones your mic is muted while they talk, so they cannot hear themselves). It is turn-taking over text, not true speech-to-speech.
+- **Selfie booth:** pick a style (wanted poster, silly mugshot, film noir, royal portrait, cartoon villain, superhero sidekick), tick the consent box, and take a selfie. The AI makes it funny and it appears on everyone's phone and the TV. Three each, and the picture budget applies. Your original is deleted once the picture is made.
+
 ## For kids and toddlers
 
 - **Toddlers (1-5)** are Mascots. A grown-up reads their clue and the room cheers.
@@ -140,3 +149,18 @@ For testing or private play you can run the AI on your own computer: `make local
 - An uploaded photo is redrawn by the local diffusion model into the character, using a prompt written for that character and the story. Clips are short slideshow videos with the scene narration.
 - Nothing is charged to the budget. Local models can be slow on a laptop, so pictures arrive when they are ready and the game never waits for them.
 - Details and hardware notes: `services/local-ai/README.md`.
+
+## Heavy drinking night (grown-ups only)
+
+In setup, **Drinking** can be set to **Heavy drinking night**. You must confirm that everyone who will drink is of legal drinking age and chooses to take part, and that you will arrange safe rides.
+
+- Each grown-up chooses when they join: **"I am in"** (real drinks, with their own limit of 2 to 6 standard drinks for the night) or **mocktails and water** (they join every round, no alcohol). There is no default: nobody drinks unless they choose it.
+- At each story beat the game posts a round on the big screen and on the right phones: toasts for everyone, random drinkers for alibi roulette and the accusation round, a mandatory **water and snack break** at the intermission, and judgment and a final toast at the reveal. Standing rules (a taboo word each act, breaking character) are honor system, logged with **Log a drink**.
+- On their phone each person taps **I drank it**, **Tap out, no penalty**, **I had water**, or **I am done for the night**. The game never prompts someone past their limit and never logs more than 2 drinks in 15 minutes for one person.
+- Kids, teens, little ones, and AI guests never take part. Tallies are private to each person and the host; the big screen never shows them.
+- The host panel shows each drinker against their limit, with **Water round now**, **Pause drinking**, and **Stop drinking for tonight** (final).
+- One standard drink is a 12 oz beer, a 5 oz glass of wine, or 1.5 oz of spirits. Eat, drink water, and nobody drives.
+
+## Launch screen
+
+When the host presses Start, everyone's phone and the TV show a progress bar and the steps (writing the mystery, casting, painting the portraits, ready) with a rotating joke while they wait. The host sees the same bar.

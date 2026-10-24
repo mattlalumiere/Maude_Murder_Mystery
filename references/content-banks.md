@@ -20,6 +20,47 @@ Each has a **substitute** (water sip, mocktail sip, or 10-sec silly act), say so
 
 **Water rounds:** GM calls one after every 3 drink triggers or every ~20 minutes. Everyone sips water or snacks. A "WATER" command from anyone triggers it.
 
+## Heavy drinking night (opt-in tier, grown-ups only)
+
+For adults who want the night to end merry or properly tipsy. The tone is drink-forward, but the safeguards are part of the rules, not extras. **Use it only when the host asked for it and confirmed everyone drinking is of legal age and chose to take part.**
+
+**Safeguards the GM always applies**
+- **Opt-in per person, in or out.** "In" players drink real drinks; "out" players join every round with a mocktail or water and get exactly the same fun. Nobody is asked why.
+- **A personal limit** for the whole night, chosen by the player: 2 to 6 standard drinks (a 12 oz beer, a 5 oz wine, or 1.5 oz of spirits). The GM tracks it, never assigns a drink past it, and tells that person "water from here".
+- **Tap out any time**, no penalty, no comment. "I am done for the night" is final. `SAFE` ends all drinking at once.
+- **Pace guard:** never more than 2 drinks for one person in 15 minutes. If a round would break that, that person has water this round.
+- **The intermission is a mandatory water and snack round.** Call a water round whenever the room gets loud.
+- Kids, teens, toddlers, and AI guests never take part, never pick who drinks, and never hear alcohol pushed at them. No chugging contests, no shots-as-forfeits, no "last one standing", no pressure on anyone, ever.
+- Remind about rides and food before the first toast and again before the final toast.
+
+**The rule bank (each is a real drink for "in" players, 1 unit unless noted)**
+| Beat | Rule |
+|---|---|
+| Act I | **The welcome toast:** everyone drinks to the birthday man. |
+| The Death | **The dead man's toast:** everyone drinks to his memory, one dramatic gasp per sip. |
+| Act II | **Alibi roulette:** 2 random drinkers drink, then recite their alibi in one breath. **Suspicious silence:** the quietest suspect drinks and shares one thing they noticed. |
+| Intermission | **Water and snacks** (0 units, everyone). |
+| Act III | **The twist toast:** everyone drinks to the plot thickening. **Secrets will out:** 2 random drinkers drink and name the guest they trust least. |
+| Act IV | **The accusation round:** 3 random drinkers drink, stand, and make their case. |
+| Reveal | **Judgment:** drinkers who accused the wrong person drink. **Detective's decree** (0 units): everyone who got it right picks another drinker to drink. **The final toast:** everyone drinks, hugs, hydrates. |
+
+**Standing rules (honor system, one drink each)**
+- **Poisoned chalice:** whoever says the word of the act drinks. Words: Act I "cheers", Act II "alibi", Act III "twist", Act IV "guilty".
+- **Fumble:** break character or say a real name, drink.
+- **Suspect:** someone points at you and says "suspect", drink.
+
+**Pacing target:** about one drink per 20 to 25 minutes per drinker over a 2-hour game, ending near each person's own limit. Never push anyone toward it.
+
+## Player traits (every player keeps their own name)
+
+Assign one private trait per player; never repeat one in a group. Exactly one player is **Murderer** (always a grown-up) and one is **Murdered** (a grown-up, or a kid or teen who volunteered to be the Ghost). Toddlers are **Royal mascot**.
+
+- **Grown-ups:** Gambler, Engineer, Con artist, Smuggler, Blackmailer, Secret heir, Retired spy, Jilted lover, Whistleblower, Failed novelist, Master chef, Scandalous flirt, Bootlegger, Fortune teller, Disgraced doctor, Treasure hunter, Insomniac, Collector, Gossip columnist, Pickpocket, Stage magician, Bounty hunter, Aspiring politician, Competitive baker.
+- **Kids and teens (G-rated):** Prankster, Secret inventor, Snack bandit, Treasure-map keeper, Animal whisperer, Hide-and-seek champion, Budding magician, Night owl, Junior reporter, Costume collector.
+- **Not in the bank, on purpose:** traits about sexual abuse or sex work. This is a game with children in the room, so those are left out. Use Scandalous flirt, Jilted lover or Blackmailer for adult-flavored drama that stays PG-13 at most.
+
+**Life story (grown-ups):** early life (a strange childhood), love life (comic, fictional rivals and mix-ups), hobbies, and an ambition, all in the campaign's theme and tone. Keep real people out of it.
+
 ## "Snack or Silly" (kids' parallel mechanic, and non-drinking adults)
 
 Whenever a drink trigger fires, kids and non-drinkers choose: a bite of snack, a sip of juice/soda, OR do a **mini-silly** (3-sec): flex like a superhero, do a robot noise, wave like royalty. No alcohol-adjacent props for kids (no toy wine glasses necessary; use juice goblets).

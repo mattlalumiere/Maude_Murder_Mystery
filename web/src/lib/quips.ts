@@ -1,0 +1,26 @@
+// Waiting-room jokes shown while the mystery is being written and the portraits are painted.
+// Family friendly: this text appears on the TV and on every phone, children included. No real people, no crude jokes.
+export const LAUNCH_QUIPS: string[] = [
+  "Good time to top up your glass.",
+  "The bathroom window is open. Wash your hands, and do not get murdered in the shower.",
+  "Check the snack table before the suspects do.",
+  "The butler is sharpening his alibi.",
+  "Nobody has been poisoned yet. Statistically, that is about to change.",
+  "The person acting least suspicious is usually the most suspicious.",
+  "Please stop whispering. The walls have ears, and so does the host.",
+  "Stretch your pointing finger. Accusations start soon.",
+  "Practice your innocent face. Now your guilty face. Now pick one.",
+  "If you hear a banana peel, do not step.",
+  "The Game Master is consulting a very dramatic cauldron.",
+  "Plot twist loading. Please stay seated and mildly alarmed.",
+  "Time to decide who you trust. (Not that person.)",
+  "Refill the dip. Murder is hungry work.",
+  "Anyone who says \"I was in the kitchen the whole time\" is lying. Probably.",
+  "Kids: sharpen your detective eyes. Grown-ups are terrible liars.",
+  "Last call for the bathroom before the body drops.",
+  "Ask the dog where it was tonight. The dog saw everything.",
+  "Phones face down when the cards arrive. Secrets are for keeping.",
+  "Somewhere, a pumpkin is looking very guilty.",
+  "Find a comfy chair. Great detectives never stand when they can slouch.",
+  "Compliment someone you are about to accuse. It is only polite.",
+];

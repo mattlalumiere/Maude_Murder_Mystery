@@ -36,7 +36,16 @@ export interface CharacterCard {
   special: string;
   /** Extra material the player supplied (own backstory or a hint for the GM). */
   extra?: string;
+  /** The embellished life story written for this player (set after casting). */
+  life?: Life;
+  /** A public-safe visual description (outfit, props, vibe) used to draw their portrait. Never hints at guilt. */
+  visual?: string;
+  /** The first-round briefing: what to do, where to start, what to note. */
+  opening?: Opening;
 }
+
+export interface Life { earlyLife: string; loveLife: string; hobbies: string; ambition: string }
+export interface Opening { objective: string; startHere: string[]; notes: string[] }
 
 export interface Character {
   id: string;
@@ -46,6 +55,12 @@ export interface Character {
   role: "suspect" | "witness" | "victim" | "mascot" | "informant";
   /** Handle (P1, P2...) of the player this character was written for, if any. */
   forHandle?: string;
+  /** Template slot (P1, P2, ...) used by the name token {{P1}}. Players keep their own names; the slot is replaced by it. */
+  slot?: string;
+  /** Public occupation, shown to everyone ("Caterer"). */
+  title?: string;
+  /** Private story trait, assigned at casting ("Gambler", "Murderer"). Only the player sees it. */
+  trait?: string;
   tease: string;
   card: CharacterCard;
 }
@@ -93,7 +108,10 @@ export interface GameConfig {
   expected: { adults: number; kids: number; toddlers: number };
   lengthMin: 90 | 120 | 150;
   spice: Spice;
-  drinking: "adults" | "none";
+  /** "adults": optional sips. "heavy": adults who opt in drink full drinks at game prompts (adults only, personal limits, tap-out always). "none": alcohol-free. */
+  drinking: "adults" | "heavy" | "none";
+  /** Heavy mode only: the host confirms every drinker is of legal drinking age and chose to take part. */
+  drinkingAttested?: boolean;
   themePrompt: string;
   settingPrompt: string;
   tonePrompt: string;
@@ -119,7 +137,15 @@ export interface BudgetState {
   plan: MediaPlan;
 }
 
+export interface DrinkProfile {
+  /** "in": takes part with real drinks up to a personal limit. "out": takes part with a mocktail or water. */
+  mode: "in" | "out";
+  /** Personal limit in standard drinks for the whole night. The game never prompts past it. */
+  limit: number;
+}
+
 export interface PlayerProfile {
+  drink?: DrinkProfile;
   backstoryMode: "gm" | "hint" | "own";
   backstory: string;
   photoKey?: string;
@@ -127,7 +153,7 @@ export interface PlayerProfile {
   avatarId?: string;
 }
 
-export type MediaKind = "avatar" | "scene" | "video";
+export type MediaKind = "avatar" | "scene" | "video" | "selfie";
 
 export interface MediaItem {
   id: string;
@@ -143,6 +169,8 @@ export interface MediaItem {
   jobRef?: string;
   note?: string;
   lockUntil?: number;
+  /** Selfie jobs: the raw photo to restyle. Deleted as soon as the job finishes. */
+  refKey?: string;
   createdAt: number;
 }
 
@@ -167,6 +195,32 @@ export interface BotLine {
   ts: number;
 }
 
+export interface DrinkPrompt {
+  id: string;
+  phase: Phase;
+  title: string;
+  text: string;
+  /** Standard drinks for people who are "in". "out" players take a mocktail or water. 0 means a water and snack round. */
+  units: number;
+  scope: "all" | "targets";
+  /** Players this prompt is for (adults taking part). */
+  targetIds: string[];
+  answers: Record<string, "drank" | "tapped">;
+  ts: number;
+}
+
+export interface DrinkTally { units: number; water: number; drinks: number[]; done: boolean }
+export interface DrinkState { prompts: DrinkPrompt[]; tally: Record<string, DrinkTally>; paused: boolean; stopped: boolean }
+
+export interface ChatMsg {
+  id: string;
+  from: string;
+  name: string;
+  text: string;
+  bot?: boolean;
+  ts: number;
+}
+
 export interface BotQueueItem { id: string; botId: string; phase: Phase }
 export interface BotConfig { chatter: boolean; voice: boolean }
 
@@ -176,6 +230,10 @@ export interface Player {
   ageGroup: AgeGroup;
   wantsVictim: boolean;
   profile: PlayerProfile;
+  /** How the story refers to this player. Names and pronouns are never changed by the story. */
+  pronouns?: "he" | "she" | "they";
+  /** The player's private detective notebook. */
+  notes?: string;
   /** AI guest: has no device or photo, and speaks through the bot engine. */
   isBot?: boolean;
   bot?: BotProfile;
@@ -222,6 +280,12 @@ export interface Room {
   paused: boolean;
   players: Player[];
   case?: CaseFile;
+  /** The story with {{P#}} name tokens still in it (saved stories use this, never real names). */
+  caseTemplate?: CaseFile;
+  /** Life stories still being written (AI): who is queued, who is done, and who a worker has claimed. */
+  life?: { queue: string[]; done: string[]; total: number; startedAt: number; claims?: { id: string; until: number }[] };
+  /** Who is the killer and the victim, and every trait, decided before the story is written (handles are P1, P2, ... in join order). */
+  castPlan?: { killer: string; victim: string; traits: Record<string, string> };
   caseSource?: "sample" | "bedrock" | "story";
   /** Saved story this game replays, and whether players pick their own character from it. */
   storyId?: string;
@@ -230,7 +294,10 @@ export interface Room {
   ballotsOpen: boolean;
   /** Set (epoch ms) while the host-triggered case generation is running; null/undefined otherwise. */
   generating?: number;
+  drinks?: DrinkState;
   botLog?: BotLine[];
+  /** The table talk: short messages between players and AI guests. */
+  chat?: ChatMsg[];
   botQueue?: BotQueueItem[];
   botConfig?: BotConfig;
   botCooldown?: Record<string, number>;

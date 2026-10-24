@@ -6,7 +6,12 @@ import { usesLocal } from "./ai/mode";
 import { caseOptionsFor, speechFor } from "./ai/route";
 import { getSpeech } from "./ai/speech";
 import { BOT_LIMITS, BOT_PERSONAS, queueBotChatter } from "./bots";
+import { answerPrompt, doneForNight, DrinkError, hostControl as drinkHostControl, hostDrinkView, logDrink, logWater, playerDrinkView, publicDrinkView, queueDrinkRound } from "./drinks";
 import { generateCase } from "./gm-ai";
+import { beginLives, fillMissingLives } from "./life";
+import { launchView } from "./launch";
+import { chatView } from "./chat";
+import { applySelfCast, planCast } from "./selfcast";
 import { openStoryCase, recordPlay } from "./stories";
 import { queueAvatars, queuePhaseMedia, reconcilePlan } from "./media-jobs";
 import { getMediaStore } from "./media-store";
@@ -61,6 +66,9 @@ export async function createRoom(
   if (trimmed.length < LIMITS.overrideCodeMin) throw new HttpError(400, `Override code must be at least ${LIMITS.overrideCodeMin} characters`);
   if (trimmed.length > LIMITS.overrideCodeMax) throw new HttpError(400, `Override code must be at most ${LIMITS.overrideCodeMax} characters`);
   const config = sanitizeConfig(configIn);
+  if (config.drinking === "heavy" && !config.drinkingAttested) {
+    throw new HttpError(400, "Heavy drinking mode needs you to confirm that everyone who drinks is of legal drinking age and chose to take part.");
+  }
   const cap = money(capIn);
   const expected = config.expected.adults + config.expected.kids + config.expected.toddlers;
   // Local services have no per-picture price, so the budget does not trim their plan.
@@ -90,10 +98,11 @@ export async function createRoom(
   throw new HttpError(500, "Could not allocate a room code");
 }
 
-export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>, characterChoice?: string): Player {
+export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVictim: boolean, hasDevice = true, profile?: Partial<PlayerProfile>, characterChoice?: string, pronouns?: string): Player {
   if (room.phase !== "lobby") throw new HttpError(409, "The game has already started");
   if (room.generating && now() - room.generating < generationLockMs()) throw new HttpError(409, "The host is starting the game. Please wait a moment.");
-  const clean = String(name ?? "").trim().slice(0, LIMITS.playerName);
+  // Braces are removed so a name can never look like a story token.
+  const clean = String(name ?? "").replace(/[{}]/g, "").trim().slice(0, LIMITS.playerName);
   if (!clean) throw new HttpError(400, "Name required");
   if (!["little", "kid", "teen", "adult"].includes(ageGroup)) throw new HttpError(400, "Bad age group");
   if (room.players.length >= LIMITS.maxPlayers) throw new HttpError(409, "Room is full");
@@ -101,7 +110,10 @@ export function addPlayer(room: Room, name: string, ageGroup: AgeGroup, wantsVic
   const p: Player = {
     id: rid(6), name: clean, ageGroup, wantsVictim, token: rid(18), ready: false, hasDevice,
     profile: sanitizeProfile(profile, room.config.allowPlayerBackstory),
+    ...(pronouns === "he" || pronouns === "she" ? { pronouns } : { pronouns: "they" as const }),
   };
+  // Heavy night: only grown-ups with a device can opt in. Everyone else, and anyone who did not choose, has no drink profile (no prompts).
+  if (!(room.config.drinking === "heavy" && ageGroup === "adult" && hasDevice)) delete p.profile.drink;
   if (room.storyMode === "choose" && typeof characterChoice === "string" && /^[A-Za-z0-9_-]{1,40}$/.test(characterChoice)) p.wantsCharacter = characterChoice;
   room.players.push(p);
   return p;
@@ -121,7 +133,7 @@ const pref = (c: Character, g: AgeGroup) => {
 
 function generic(n: number, kid: boolean): Character {
   return {
-    id: `guest-${kid ? "k" : "a"}${n}`, name: kid ? `Little Guest ${n}` : `Party Guest ${n}`,
+    id: `guest-${kid ? "k" : "a"}${n}`, slot: `G${kid ? "k" : "a"}${n}`, name: `{{G${kid ? "k" : "a"}${n}}}`, title: kid ? "Little guest" : "Party guest",
     house: "Wandering Guests", kid, role: "witness", tease: "A guest who sees more than they say.",
     card: {
       story: "You are an invited guest with a good view of the party.",
@@ -139,6 +151,19 @@ function castPlayers(room: Room) {
   const chars = [...k.characters];
   const taken = new Set<string>();
   const assign = (p: Player, c: Character) => { p.characterId = c.id; taken.add(c.id); };
+
+  // A story written for this exact cast names a character for every player (forHandle). Use it as is.
+  if (!room.storyId && room.players.every((p, i) => chars.some((c) => c.forHandle === `P${i + 1}`))) {
+    room.players.forEach((p, i) => assign(p, chars.find((c) => c.forHandle === `P${i + 1}`)!));
+    k.characters = chars.map((c) => ({ ...c, slot: c.slot ?? c.forHandle }));
+    for (const p of room.players) {
+      const c = k.characters.find((x) => x.id === p.characterId);
+      if (c && p.profile.backstory) c.card.extra = p.profile.backstoryMode === "own" ? `Your own backstory (from you): ${p.profile.backstory}` : `Your idea for the GM: ${p.profile.backstory}`;
+    }
+    return;
+  }
+
+  room.castPlan = undefined; // not a story written for this cast: roles come from the story itself
 
   // Choose-your-character stories: honour requests first (first come, first served, only a fitting character).
   if (room.storyMode === "choose") {
@@ -212,12 +237,14 @@ export async function startGame(room: Room) {
   if (room.players.length < LIMITS.minPlayers) throw new HttpError(400, `Need at least ${LIMITS.minPlayers} players`);
   if (room.players.filter((p) => p.ageGroup === "adult").length < LIMITS.minAdults) throw new HttpError(400, `Need at least ${LIMITS.minAdults} adults`);
   const adults = room.players.filter((p) => p.ageGroup === "adult").length;
+  room.castPlan = planCast(room);
   const gen = room.storyId
     ? { case: await openStoryCase(room.storyId), source: "story" as const }
     : await generateCase(
     {
       adults, kids: room.players.length - adults, littles: room.players.filter((p) => p.ageGroup === "little").length,
       players: room.players.map((p, i) => ({ handle: `P${i + 1}`, ageGroup: p.ageGroup, mode: p.profile.backstoryMode, text: p.profile.backstory })),
+      cast: planCast(room, room.castPlan).entries,
     },
     room.config,
     { gameId: room.code, ...caseOptionsFor(room) },
@@ -225,7 +252,8 @@ export async function startGame(room: Room) {
   room.case = gen.case;
   room.caseSource = gen.source;
   castPlayers(room);
-  queueAvatars(room);
+  applySelfCast(room);
+  beginLives(room);
   setPhase(room, "cards");
   if (room.storyId) void recordPlay(room.storyId, room.code).catch(() => {});
 }
@@ -237,6 +265,7 @@ export function beginGeneration(room: Room) {
   if (room.players.filter((p) => p.ageGroup === "adult").length < LIMITS.minAdults) throw new HttpError(400, `Need at least ${LIMITS.minAdults} adults`);
   if (room.generating && now() - room.generating < generationLockMs()) throw new HttpError(409, "Your mystery is already being written");
   room.generating = now();
+  room.castPlan = planCast(room);
 }
 
 export function generationRoster(room: Room) {
@@ -244,6 +273,7 @@ export function generationRoster(room: Room) {
   return {
     adults, kids: room.players.length - adults, littles: room.players.filter((p) => p.ageGroup === "little").length,
     players: room.players.map((p, i) => ({ handle: `P${i + 1}`, ageGroup: p.ageGroup, mode: p.profile.backstoryMode, text: p.profile.backstory })),
+    cast: planCast(room, room.castPlan).entries,
   };
 }
 
@@ -253,7 +283,8 @@ export function finishGeneration(room: Room, gen: Awaited<ReturnType<typeof gene
   room.case = gen.case;
   room.caseSource = gen.source;
   castPlayers(room);
-  queueAvatars(room);
+  applySelfCast(room);
+  beginLives(room);
   room.generating = undefined;
   setPhase(room, "cards");
   return true;
@@ -273,10 +304,12 @@ function setPhase(room: Room, phase: Phase) {
   if (phase === "reveal") { fillBotBallots(room); room.result = computeResult(room); }
   queuePhaseMedia(room, phase);
   queueBotChatter(room, phase);
+  queueDrinkRound(room, phase);
 }
 
 export function advance(room: Room) {
   if (room.paused) throw new HttpError(409, "Game is paused");
+  if (room.phase === "cards") fillMissingLives(room); // nobody enters the story without a briefing
   const i = PHASES.indexOf(room.phase);
   if (room.phase === "lobby") throw new HttpError(409, "Start the game first");
   if (i >= PHASES.length - 1) throw new HttpError(409, "The mystery is over");
@@ -387,7 +420,7 @@ export function publicView(room: Room) {
   const roster = k
     ? room.players.map((p) => {
         const c = k.characters.find((x) => x.id === p.characterId);
-        return { playerName: p.name, characterName: c?.name ?? "", house: c?.house ?? "", tease: c?.tease ?? "", kid: c?.kid ?? false, avatarId: p.profile.avatarId };
+        return { playerName: p.name, characterName: c?.name ?? "", house: c?.house ?? "", tease: c?.tease ?? "", title: c?.title ?? "", kid: c?.kid ?? false, avatarId: p.profile.avatarId };
       })
     : [];
   const clues = k
@@ -396,10 +429,13 @@ export function publicView(room: Room) {
   return {
     code: room.code, version: room.version, phase: room.phase, phaseTitle: info.title, clock: info.clock, paused: room.paused,
     title: k?.title, setting: k?.setting, partyName: room.config.name || k?.title || "Murder Mystery Night",
-    media: room.media.filter((m) => m.status === "done").map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, caption: m.caption, mime: m.mime })),
+    media: room.media.filter((m) => m.status === "done" && m.kind !== "selfie").map((m) => ({ id: m.id, kind: m.kind, phase: m.phase, caption: m.caption, mime: m.mime })),
+    selfies: room.media.filter((m) => m.status === "done" && m.kind === "selfie").slice(-12).map((m) => ({ id: m.id, caption: m.caption })),
     narration: k?.narration[room.phase],
     lobbyNames: room.players.map((p) => p.name),
     starting: !!room.generating,
+    drink: publicDrinkView(room),
+    launch: launchView(room),
     storyId: room.storyId ?? null,
     bots: room.case
       ? room.players.filter((p) => p.isBot).map((p) => ({ id: p.id, name: p.name, characterName: room.case!.characters.find((c) => c.id === p.characterId)?.name ?? p.name, avatarId: p.profile.avatarId }))
@@ -431,10 +467,13 @@ export function playerView(room: Room, p: Player) {
   const c = room.case?.characters.find((x) => x.id === p.characterId);
   return {
     ...publicView(room),
+    chat: chatView(room),
     me: {
-      id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, ballot: p.ballot, avatarId: p.profile.avatarId,
+      id: p.id, name: p.name, ageGroup: p.ageGroup, ready: p.ready, ballot: p.ballot, avatarId: p.profile.avatarId, drink: playerDrinkView(room, p),
+      notes: p.notes ?? "", pronouns: p.pronouns, selfieOk: p.ageGroup === "adult" || process.env.ALLOW_MINOR_PHOTOS === "true",
+      selfies: room.media.filter((m) => m.kind === "selfie" && m.playerIds[0] === p.id).map((m) => ({ id: m.id, status: m.status, note: m.note })),
       profile: { backstoryMode: p.profile.backstoryMode, backstory: p.profile.backstory, consent: p.profile.consent, hasPhoto: !!p.profile.photoKey },
-      character: c ? { id: c.id, name: c.name, house: c.house, tease: c.tease, kid: c.kid, role: c.role, card: c.card } : undefined,
+      character: c ? { id: c.id, name: c.name, house: c.house, tease: c.tease, kid: c.kid, role: c.role, title: c.title, trait: c.trait, card: c.card } : undefined,
     },
   };
 }
@@ -446,9 +485,11 @@ export function hostView(room: Room) {
     overrideUsed: room.overrideUsed,
     lockedUntil: room.lockedUntil,
     config: room.config,
+    drinks: hostDrinkView(room),
     generating: room.generating ?? null,
     generationWindowMs: generationLockMs() - 10_000,
     botQueued: (room.botQueue ?? []).length,
+    lifeLeft: room.life ? room.life.total - room.life.done.length : 0,
     caseSource: room.caseSource,
     aiMode: room.config.aiMode ?? "auto",
     localAi: usesLocal(room),
@@ -493,8 +534,15 @@ export async function removePhoto(room: Room, p: Player) {
   p.profile.consent = "none";
 }
 
+/** The detective notebook is private to its owner and never shown to anyone else. */
+export function saveNotes(p: Player, notes: unknown) {
+  if (typeof notes !== "string") throw new HttpError(400, "Notes must be text");
+  p.notes = notes.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").slice(0, 4000);
+}
+
 export async function purgePhotos(room: Room) {
   await getMediaStore().deletePrefix(`${room.code}/photos`);
+  await getMediaStore().deletePrefix(`${room.code}/selfies`);
   for (const p of room.players) { p.profile.photoKey = undefined; p.profile.consent = "none"; }
 }
 
@@ -575,3 +623,16 @@ function fillBotBallots(room: Room) {
     if (target && method && motive) bot.ballot = { killerId: target.id, methodId: method.id, motiveId: motive.id };
   }
 }
+
+// ---------- heavy drinking night: player and host actions ----------
+function drinkAction<T>(fn: () => T): T {
+  try { return fn(); } catch (e) { if (e instanceof DrinkError) throw new HttpError(e.status, e.message); throw e; }
+}
+export const drinkAnswer = (room: Room, p: Player, promptId: string, answer: "drank" | "tapped") => drinkAction(() => answerPrompt(room, p, String(promptId), answer === "drank" ? "drank" : "tapped"));
+export const drinkLog = (room: Room, p: Player) => drinkAction(() => logDrink(room, p));
+export const drinkWater = (room: Room, p: Player) => drinkAction(() => logWater(room, p));
+export const drinkDone = (room: Room, p: Player) => drinkAction(() => doneForNight(room, p));
+export const drinkControl = (room: Room, op: string) => drinkAction(() => {
+  if (!["pause", "resume", "water", "stop"].includes(op)) throw new HttpError(400, "Unknown control");
+  drinkHostControl(room, op as "pause" | "resume" | "water" | "stop");
+});

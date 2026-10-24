@@ -166,7 +166,7 @@ describe("repairCase fixes only safe things", () => {
   });
   it("maps a killer or truth reference given by name onto the matching id", () => {
     const c = fresh();
-    c.killerId = "Carol Greenthumb"; c.victimId = " GUS PENNYWHISTLE "; c.truth.methodId = "Sleepy lavender tonic in his goblet";
+    c.killerId = "{{P2}}"; c.victimId = " {{P1}} "; c.truth.methodId = "Sleepy lavender tonic in the goblet";
     const r = repairCase(c);
     expect(validateCase(r.case, roster).ok).toBe(true);
     expect((r.case as CaseFile).killerId).toBe("carol");

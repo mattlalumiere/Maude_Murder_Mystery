@@ -2,6 +2,7 @@
 // SECRECY: only public facts are used (title, setting, narration, character name, tease, house, age group).
 // Never the secret, alibi, what a character knows, the clues, or the solution.
 import type { TextModel } from "./ai/ports";
+import { portraitLook } from "./backstory";
 import { cleanLine } from "./bots";
 import type { Character, MediaItem, Room } from "./types";
 
@@ -14,7 +15,7 @@ const firstSentences = (s: string, n: number) => (s.match(/[^.!?]+[.!?]+/g) ?? [
 
 interface Facts {
   title: string; setting: string; moment: string;
-  cast: { name: string; tease: string; house: string; kid: boolean; hasPhoto: boolean }[];
+  cast: { name: string; title: string; look: string; tease: string; house: string; kid: boolean; hasPhoto: boolean }[];
 }
 
 export function publicFacts(room: Room, job: Pick<MediaItem, "kind" | "phase" | "playerIds" | "caption">): Facts {
@@ -22,7 +23,7 @@ export function publicFacts(room: Room, job: Pick<MediaItem, "kind" | "phase" | 
   const cast = job.playerIds.map((id) => {
     const p = room.players.find((x) => x.id === id);
     const c: Character | undefined = k.characters.find((x) => x.id === p?.characterId);
-    return c ? { name: c.name, tease: c.tease, house: c.house, kid: c.kid, hasPhoto: !!p?.profile.photoKey && p.profile.consent !== "none" } : null;
+    return c ? { name: c.name, title: c.title ?? "guest", look: portraitLook(c), tease: c.tease, house: c.house, kid: c.kid, hasPhoto: !!p?.profile.photoKey && p.profile.consent !== "none" } : null;
   }).filter((x): x is Facts["cast"][number] => !!x);
   const beat: Partial<Record<string, string>> = {
     act1: k.narration.act1, death: k.narration.death, act2: k.narration.act2, act3: k.twist, act4: k.narration.act4,
@@ -38,14 +39,14 @@ export function templatePrompt(room: Room, job: Pick<MediaItem, "kind" | "phase"
   const keep = withPhoto ? " Keep the hair, face shape and glasses of the reference photo." : "";
   if (job.kind === "avatar") {
     const c = f.cast[0];
-    const who = c ? `${c.name}, ${c.tease.replace(/\.$/, "")}` : "a party guest";
+    const who = c ? `a ${c.title}: ${c.look}` : "a party guest";
     const age = c?.kid ? "a child" : "an adult";
     return {
       prompt: `Cartoon storybook portrait of ${who}. ${age}. Head and shoulders, friendly expression, warm lighting. Clothing and props that suit a character from the ${c?.house ?? "household"} in this story: ${f.setting}${keep} Family-friendly illustration.`.slice(0, 900),
       negative: NEGATIVE_PROMPT, strength: withPhoto ? 0.6 : 1, source: "template",
     };
   }
-  const people = f.cast.map((c) => `${c.name} (${c.tease.replace(/\.$/, "")})`).join("; ");
+  const people = f.cast.map((c) => `a ${c.title} (${c.look})`).join("; ");
   return {
     prompt: `Cartoon storybook scene for a family murder mystery comedy. ${f.setting} Moment: ${f.moment}${people ? ` Featuring ${people}.` : ""}${keep} Warm cinematic lighting, expressive faces, no text. Family-friendly.`.slice(0, 900),
     negative: NEGATIVE_PROMPT, strength: withPhoto ? 0.72 : 1, source: "template",
@@ -66,7 +67,7 @@ export async function directPrompt(room: Room, job: Pick<MediaItem, "kind" | "ph
   if (!model) return base;
   const f = publicFacts(room, job);
   const withPhoto = f.cast.some((c) => c.hasPhoto);
-  const user = JSON.stringify({ kind: job.kind, story: f.title, setting: f.setting, moment: f.moment, characters: f.cast.map(({ name, tease, house, kid }) => ({ name, tease, house, young: kid })), referencePhoto: withPhoto });
+  const user = JSON.stringify({ kind: job.kind, story: f.title, setting: f.setting, moment: f.moment, characters: f.cast.map(({ title, look, house, kid }) => ({ occupation: title, look, house, young: kid })), referencePhoto: withPhoto });
   try {
     const r = await model.generate({ system: SYSTEM, user, maxOutputTokens: 140, temperature: 0.7, timeoutMs: 20_000 });
     const text = cleanLine(r.text, 420);

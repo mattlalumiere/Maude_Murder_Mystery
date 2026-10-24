@@ -217,6 +217,10 @@ export function repairCase(input: unknown): RepairResult {
       r.tease = ch.tease === undefined ? (fix(`${p}.tease: defaulted to empty`), "") : str(`${p}.tease`, ch.tease, LIMITS.caseText);
       if (typeof ch.forHandle === "string" && HANDLE_RE.test(ch.forHandle.trim())) r.forHandle = ch.forHandle.trim();
       else if (ch.forHandle !== undefined) fix(`${p}.forHandle: dropped`);
+      // Self-cast fields: the name-token slot, the public occupation and the private trait.
+      if (typeof ch.slot === "string" && /^[A-Za-z0-9]{1,8}$/.test(ch.slot.trim())) r.slot = ch.slot.trim();
+      if (typeof ch.title === "string") r.title = cleanStr(ch.title, 60);
+      if (typeof ch.trait === "string") r.trait = cleanStr(ch.trait, 40);
       if (isObj(ch.card)) {
         const card: Record<string, any> = {};
         for (const f of STR_CARD) card[f] = str(`${p}.card.${f}`, ch.card[f], LIMITS.caseText);

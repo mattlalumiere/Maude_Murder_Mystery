@@ -1,13 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { BotsPanel } from "./BotsPanel";
+import { DrinkPanel } from "./DrinkPanel";
+import { LaunchProgress } from "@/components/LaunchProgress";
 import { BudgetPanel } from "./BudgetPanel";
 import { SaveStoryCard } from "./SaveStoryCard";
 import type { HostState } from "@/app/_views";
 import { CopyButton } from "@/components/CopyButton";
 import { Qr } from "@/components/Qr";
 import { Badge, Button, Card, ConnectionCandle, ErrorNote, Field, Notice, Skeleton } from "@/components/kit";
-import { askConfirm, friendlyError, nextPhaseTitle, originUrl, phaseIndex, runBotTick, runGenerate, runMedia, sendAction, useDocTitle, useRoom } from "@/lib/client";
+import { askConfirm, friendlyError, nextPhaseTitle, originUrl, phaseIndex, runBotTick, runLife, runGenerate, runMedia, sendAction, useDocTitle, useRoom } from "@/lib/client";
 import type { AgeGroup } from "@/lib/types";
 
 export default function HostConsole({ code }: { code: string }) {
@@ -55,6 +57,23 @@ export default function HostConsole({ code }: { code: string }) {
     const t = setInterval(() => { if (!stop) tick(); }, 3000);
     return () => { stop = true; clearInterval(t); };
   }, [botPending, code, refresh]);
+
+  // Life stories: while any are still being written, run two writers at a time (the local model handles that comfortably).
+  const lifePending = (state?.lifeLeft ?? 0) > 0;
+  const lifeWorking = useRef(false);
+  useEffect(() => {
+    if (!lifePending) return;
+    let stop = false;
+    const tick = async () => {
+      if (lifeWorking.current) return;
+      lifeWorking.current = true;
+      try { await Promise.all([runLife(code), runLife(code)]); await refresh(true); } catch { /* retried next tick */ }
+      lifeWorking.current = false;
+    };
+    tick();
+    const t = setInterval(() => { if (!stop) tick(); }, 3000);
+    return () => { stop = true; clearInterval(t); };
+  }, [lifePending, code, refresh]);
 
   // Start is two steps: the server claims the room (fast), then this tab asks it to write the mystery (slow, up to ~50 s).
   const genRef = useRef<number | null>(null);
@@ -148,7 +167,7 @@ export default function HostConsole({ code }: { code: string }) {
               </Notice>
             )}
             {state.generating && Date.now() - state.generating < (state.generationWindowMs ?? 80_000) ? (
-              <Notice data-testid="host-writing">The Game Master is writing your mystery and casting everyone. {state.localAi ? "On a local model this can take several minutes." : "This can take up to a minute."} Keep this tab open.</Notice>
+              <LaunchProgress launch={state.launch} title="Writing your mystery" />
             ) : (
               <Button size="lg" block loading={busy} disabled={!canStart} onClick={() => act({ type: "start" })} data-testid="host-start">
                 {state.generating ? "That took too long. Start again" : canStart ? "Cast the characters and start" : "Waiting for players..."}
@@ -178,6 +197,10 @@ export default function HostConsole({ code }: { code: string }) {
           </>
         )}
       </Card>
+
+      {state.phase === "cards" && <LaunchProgress launch={state.launch} />}
+
+      <DrinkPanel state={state} act={act} busy={busy} />
 
       <BotsPanel state={state} act={act} busy={busy} />
 
@@ -268,6 +291,21 @@ export default function HostConsole({ code }: { code: string }) {
             {msg && <p style={{ whiteSpace: "pre-wrap" }} role="status" data-testid="override-message"><b>{msg}</b></p>}
           </div>
         </details>
+      )}
+
+      {lobby && (
+        <Card title="Ready to begin?" tone="glow" style={{ marginTop: "var(--space-4)" }} data-testid="host-start-bottom-card">
+          {state.generating && Date.now() - state.generating < (state.generationWindowMs ?? 80_000) ? (
+            <LaunchProgress launch={state.launch} title="Writing your mystery" />
+          ) : (
+            <>
+              {!canStart && <p className="muted" style={{ marginTop: 0 }}>Start is waiting for {startNeeds}. {state.players.length} joined so far.</p>}
+              <Button size="lg" block loading={busy} disabled={!canStart} onClick={() => act({ type: "start" })} data-testid="host-start-bottom">
+                {state.generating ? "That took too long. Start again" : canStart ? "Cast the characters and start" : "Waiting for players..."}
+              </Button>
+            </>
+          )}
+        </Card>
       )}
     </main>
   );

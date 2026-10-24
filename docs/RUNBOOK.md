@@ -68,6 +68,10 @@ With `CLOUD_PROVIDER=aws` (set in `sst.config.ts`) AI guests speak through **Ama
 
 Saved stories live in a separate **Stories** bucket with no expiry rule (the Media bucket deletes everything after one day). `sst.config.ts` creates it and passes `STORY_BUCKET`. Set `STORY_SEAL_KEY` (`openssl rand -base64 32`) before the first deploy and keep it: changing it makes existing saved stories unreadable. Dry run: save a story from a finished game, open its page in a private window, vote, and start a game from it. Note the gallery index and vote counters are plain objects with last-writer-wins updates; a very busy gallery could show slightly stale counts.
 
+## 4d. Selfie booth, table chat and voice calls (optional)
+
+Selfies use the same image provider and budget as portraits (each one is claimed through the spend cap), so set a budget that has room. Include one selfie and one chat message to an AI guest in the dry run, and confirm the raw selfie object is gone from the Media bucket afterward (`<code>/selfies/`). Voice calls use browser speech recognition on phones unless local services are on, so test on the phones you will use and note that iPhones need Safari or Chrome with microphone permission.
+
 ## 5. Party-day checklist
 
 - [ ] Deploy at least a day ahead; re-run `/api/healthz`.
